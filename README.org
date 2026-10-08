@@ -1,0 +1,106 @@
+#+title: @0k/time-chart
+
+Linked, zoomable time-series charts for the browser, built on
+[[https://echarts.apache.org/][Apache ECharts]]. No framework required.
+
+- Day, month and year guides that fade in with zoom, weekends hatched,
+  and a "now" line; all in local time, correct across DST changes.
+- Wheel zoom and drag pan on the time axis; charts sharing a ~link~ key
+  zoom together.
+- Stacked areas, min/max bands and gaps for missing values.
+- Light and dark themes, following the OS by default.
+
+* Install
+
+#+begin_src sh
+npm install @0k/time-chart
+#+end_src
+
+* Usage
+
+#+begin_src typescript
+import { createTimeChart } from '@0k/time-chart';
+
+const now = Date.now();
+const chart = createTimeChart(document.getElementById('chart')!, {
+  series: [{
+    id: 'sensor-a',
+    label: 'Sensor A',
+    points: [[now - 3_600_000, 2], [now, 3]],
+  }],
+  formatValue: value => value.toFixed(2),
+  onWindowChange: (start, end) => { /* fetch data for this window */ },
+});
+
+chart.setSeries(newSeries);   // keeps the current window and hidden series
+chart.setWindow(start, end);
+chart.destroy();
+#+end_src
+
+The element must have a nonzero size. Times are Unix milliseconds.
+
+* Series
+
+| Field          | Description                                                  |
+|----------------+--------------------------------------------------------------|
+| ~id~           | Unique identifier                                            |
+| ~label~        | Name shown in the legend and tooltip                         |
+| ~points~       | ~[time, value]~ pairs sorted by time; ~null~ value is a gap  |
+| ~min~, ~max~   | Optional band bounds, one per point                          |
+| ~group~        | Series of a group get close colors                           |
+| ~stack~        | Stack with the other stacked series                          |
+| ~color~        | Explicit CSS color instead of the generated one              |
+
+* Options
+
+| Option           | Default             | Description                                    |
+|------------------+---------------------+------------------------------------------------|
+| ~series~         | required            | Series to draw                                 |
+| ~window~         | data extent         | Initial ~{start, end}~ shown                   |
+| ~formatValue~    | localized number    | Formats y-axis labels and tooltip values       |
+| ~formatTime~     | localized date/time | Formats the tooltip time                       |
+| ~yAxis~          |                     | ~{min, max, name}~; ~max: 'data'~ fixes it at 1.2 × data maximum (default) |
+| ~tooltip~        | ~'axis'~            | ~'axis'~ (all series) or ~'item'~ (one)        |
+| ~legend~         |                     | ~{show, collapsed, width}~, shown on the right |
+| ~link~           |                     | Charts with the same key zoom and pan together |
+| ~onWindowChange~ |                     | Called after the user zooms or pans            |
+| ~onLegendToggle~ |                     | Called when the user toggles a series          |
+| ~locale~         | browser locale      | Locale for labels and default formatters       |
+| ~theme~          | ~'auto'~            | ~'auto'~, ~'light'~ or ~'dark'~                |
+
+* Methods
+
+| Method                     | Description                                   |
+|----------------------------+-----------------------------------------------|
+| ~setSeries(series)~        | Replace the data                              |
+| ~setWindow(start, end)~    | Show this time range (no ~onWindowChange~)    |
+| ~getWindow()~              | Current ~{start, end}~                        |
+| ~setHidden(ids)~           | Hide these series                             |
+| ~highlight(ids)~           | Emphasize these series; ~null~ resets         |
+| ~setLegendCollapsed(bool)~ | Hide or show the legend                       |
+| ~resize()~                 | Redraw after a size change                    |
+| ~destroy()~                | Release the chart; safe to call twice         |
+
+~calendarGuides(start, end, widthPx, now, locale?)~ is also exported: it
+returns the guide lines and weekend bands for a time range, without
+drawing anything.
+
+* Development
+
+#+begin_src sh
+npm install
+npm run check   # typecheck, tests, build
+npm run demo    # http://127.0.0.1:5187/demo/
+#+end_src
+
+To use a working copy from another project without changing its
+committed files:
+
+#+begin_src sh
+npm run watch                                # here
+npm install --no-save /path/to/time-chart    # in the other project
+#+end_src
+
+* License
+
+MIT

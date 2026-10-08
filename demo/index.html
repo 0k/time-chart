@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>Time chart / linked telemetry</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #ffffff; --panel: #f7f8fa; --border: #e2e5ea;
+      --text: #1c2024; --muted: #6b7280; --accent: #2563eb;
+      --space-1: 4px; --space-2: 8px; --space-3: 12px;
+      --space-4: 16px; --space-6: 24px; --space-8: 32px;
+      --type-small: 12px; --type-body: 14px; --type-title: 28px;
+      --radius: 4px; --hairline: 1px; --chart-height: 320px;
+    }
+    @media (prefers-color-scheme: dark) { :root {
+      --bg: #16181d; --panel: #1d2027; --border: #333842;
+      --text: #e6e8eb; --muted: #9aa1ac; --accent: #3b82f6;
+    } }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: var(--space-8); background: var(--bg); color: var(--text); font: var(--type-body) "DejaVu Sans", sans-serif; }
+    header { display: flex; justify-content: space-between; align-items: center; gap: var(--space-6); margin-bottom: var(--space-6); }
+    h1 { font: bold var(--type-title) "DejaVu Serif", serif; margin: 0 0 var(--space-2); }
+    p { color: var(--muted); margin: 0; }
+    nav { display: flex; gap: var(--space-2); }
+    button { border: var(--hairline) solid var(--border); border-radius: var(--radius); padding: var(--space-2) var(--space-3); background: var(--panel); color: var(--text); font: inherit; cursor: pointer; }
+    button:focus-visible { outline: var(--hairline) solid var(--accent); }
+    section { border-top: var(--hairline) solid var(--border); padding-top: var(--space-4); margin-bottom: var(--space-6); }
+    .section-title { display: flex; justify-content: space-between; align-items: center; padding: 0 var(--space-4); }
+    h2 { font-size: var(--type-body); margin: 0; }
+    .chart { width: 100%; height: var(--chart-height); }
+    output { font: var(--type-small) "DejaVu Sans Mono", monospace; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <div><h1>Time, in context.</h1><p>Three linked charts · wheel to zoom · drag to pan · click a legend to hide</p></div>
+    <nav aria-label="Time window"><button id="week">Week</button><button id="month">30 days</button><button id="year">Year</button></nav>
+  </header>
+  <main>
+    <section><div class="section-title"><h2>01 / Stacked bytes</h2><button data-collapse="0" aria-expanded="true">Collapse legend</button></div><div class="chart" id="stacked"></div></section>
+    <section><div class="section-title"><h2>02 / Observations and min–max bands</h2><button data-collapse="1" aria-expanded="true">Collapse legend</button></div><div class="chart" id="bands"></div></section>
+    <section><div class="section-title"><h2>03 / Gaps are not interpolated</h2><button data-collapse="2" aria-expanded="true">Collapse legend</button></div><div class="chart" id="gaps"></div></section>
+  </main>
+  <output id="window" aria-live="polite"></output>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

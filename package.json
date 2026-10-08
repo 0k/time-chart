@@ -1,0 +1,35 @@
+{
+  "name": "@0k/time-chart",
+  "version": "%%version%%",
+  "description": "Framework-free linked time-series charts with local calendar guides.",
+  "keywords": ["chart", "time-series", "echarts", "calendar", "zoom"],
+  "author": "Valentin Lab <valentin.lab@kalysto.org>",
+  "license": "MIT",
+  "repository": {"type": "git", "url": "git+https://github.com/0k/time-chart.git"},
+  "homepage": "https://github.com/0k/time-chart",
+  "bugs": {"url": "https://github.com/0k/time-chart/issues"},
+  "publishConfig": {"access": "public"},
+  "type": "module",
+  "files": ["dist", "README.md", "LICENSE"],
+  "types": "./dist/index.d.ts",
+  "exports": {".": {"types": "./dist/index.d.ts", "default": "./dist/index.js"}},
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepare": "npm run build",
+    "watch": "tsc -p tsconfig.build.json --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm test && npm run build",
+    "demo": "vite --host 127.0.0.1 --port 5187 --strictPort"
+  },
+  "dependencies": {
+    "echarts": "^5.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.5",
+    "jsdom": "25.0.1",
+    "typescript": "5.7.3",
+    "vite": "6.0.7",
+    "vitest": "3.0.5"
+  }
+}
