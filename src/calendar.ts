@@ -34,17 +34,17 @@ export function calendarGuides(startMs: number, endMs: number, widthPx: number, 
   const month = new Intl.DateTimeFormat(locale, { month: "short" });
 
   if (dayAlpha > 0) {
-    const d = new Date(startMs);
-    d.setHours(0, 0, 0, 0);
-    if (d.getTime() < startMs) d.setDate(d.getDate() + 1);
-    for (let count = 0; d.getTime() <= endMs && count < MAX_ITEMS; count++, d.setDate(d.getDate() + 1)) {
+    // Build every day from its date parts: stepping an existing Date would
+    // carry the 01:00 of a day whose midnight a DST jump skipped onto all
+    // following days.
+    const start = new Date(startMs);
+    const y = start.getFullYear(), m = start.getMonth();
+    let day = start.getDate();
+    if (new Date(y, m, day).getTime() < startMs) day++;
+    for (let count = 0, d = new Date(y, m, day); d.getTime() <= endMs && count < MAX_ITEMS; count++, d = new Date(y, m, ++day)) {
       const t = d.getTime(), monday = d.getDay() === 1;
       lines.push({ t, tier: "day", label: labelAlpha > LABEL_MIN ? weekday.format(d) : null, lineAlpha: dayAlpha * (monday ? 0.7 : 0.5), labelAlpha, monday });
-      if (d.getDay() === 6) {
-        const end = new Date(t);
-        end.setDate(end.getDate() + 2);
-        bands.push({ start: t, end: end.getTime(), alpha: dayAlpha * 0.9 });
-      }
+      if (d.getDay() === 6) bands.push({ start: t, end: new Date(y, m, day + 2).getTime(), alpha: dayAlpha * 0.9 });
     }
   }
   if (monthAlpha > 0) {
