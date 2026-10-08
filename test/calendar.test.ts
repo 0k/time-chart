@@ -17,6 +17,10 @@ describe("calendar specification", () => {
   it("bounds weekends by local Saturday and Monday", () => {
     expect(guides(at(2026, 2, 28), at(2026, 2, 30)).bands[0]).toMatchObject({ start: at(2026, 2, 28), end: at(2026, 2, 30) });
   });
+  it.each([[2026, 2, 28, 12], [2026, 2, 29, 12]])("hatches a weekend already in progress at the window start (%i-%i-%i %ih)", (y, m, d, h) => {
+    const start = new Date(y, m, d, h).getTime();
+    expect(guides(start, at(2026, 2, 31)).bands.map(b => [b.start, b.end])).toEqual([[at(2026, 2, 28), at(2026, 2, 30)]]);
+  });
   it("keeps January label while the year owns the line", () => {
     const lines = guides(at(2026, 0, 1), at(2026, 0, 2)).lines;
     expect(lines.find(g => g.tier === "month")).toMatchObject({ hidden: true, lineAlpha: 0, label: "Jan" });

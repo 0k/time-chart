@@ -38,13 +38,18 @@ export function calendarGuides(startMs: number, endMs: number, widthPx: number, 
     // carry the 01:00 of a day whose midnight a DST jump skipped onto all
     // following days.
     const start = new Date(startMs);
-    const y = start.getFullYear(), m = start.getMonth();
-    let day = start.getDate();
+    const y = start.getFullYear(), m = start.getMonth(), first = start.getDate();
+    let day = first;
     if (new Date(y, m, day).getTime() < startMs) day++;
     for (let count = 0, d = new Date(y, m, day); d.getTime() <= endMs && count < MAX_ITEMS; count++, d = new Date(y, m, ++day)) {
       const t = d.getTime(), monday = d.getDay() === 1;
       lines.push({ t, tier: "day", label: labelAlpha > LABEL_MIN ? weekday.format(d) : null, lineAlpha: dayAlpha * (monday ? 0.7 : 0.5), labelAlpha, monday });
-      if (d.getDay() === 6) bands.push({ start: t, end: new Date(y, m, day + 2).getTime(), alpha: dayAlpha * 0.9 });
+    }
+    // Start one day early: a weekend in progress at startMs began on a
+    // Saturday before the window, and is still hatched.
+    for (let count = 0, i = first - 1, d = new Date(y, m, i); d.getTime() <= endMs && count < MAX_ITEMS; count++, d = new Date(y, m, ++i)) {
+      const end = new Date(y, m, i + 2).getTime();
+      if (d.getDay() === 6 && end > startMs) bands.push({ start: d.getTime(), end, alpha: dayAlpha * 0.9 });
     }
   }
   if (monthAlpha > 0) {
