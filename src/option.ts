@@ -147,7 +147,8 @@ export function buildOption(state: NormalizedState) {
     },
     dataZoom: [{ type: "inside" as const, xAxisIndex: 0, filterMode: "none", startValue: state.window.start, endValue: state.window.end, zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false }],
     legend: {
-      show: options.legend?.show !== false && !state.legendCollapsed, type: "scroll", orient: "vertical", data: state.series.map(s => s.id),
+      // Solid swatch: the default empty circle is filled white, glaring on dark.
+      icon: "roundRect", show: options.legend?.show !== false && !state.legendCollapsed, type: "scroll", orient: "vertical", data: state.series.map(s => s.id),
       selected: Object.fromEntries(state.series.map(s => [s.id, !state.hidden.has(s.id)])), formatter: (id: string) => labels.get(id) ?? id,
       right: 8, top: GRID_TOP, bottom: 8, width: (options.legend?.width ?? 340) - 16, itemWidth: 18, itemGap: 6,
       textStyle: { fontSize: 11, width: (options.legend?.width ?? 340) - 48, overflow: "truncate", ellipsis: "…", color: p.legendText },

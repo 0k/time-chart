@@ -38,3 +38,6 @@ it("applies highlight proportions and collapse insets", () => {
   const state = normalizeState({ series }); state.highlight = new Set(); state.legendCollapsed = true;
   const o = buildOption(state); expect("lineStyle" in o.series[0] && o.series[0].lineStyle).toMatchObject({ width: 0.5, opacity: 0.7 }); expect(o.grid.right).toBe(24);
 });
+it("draws legend icons as solid swatches, never the white-filled default circle", () => {
+  expect(buildOption(normalizeState({ series })).legend.icon).toBe("roundRect");
+});
