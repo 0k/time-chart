@@ -4,6 +4,7 @@ import { GridComponent, TooltipComponent, LegendComponent, DataZoomInsideCompone
 import { CanvasRenderer } from "echarts/renderers";
 import { buildGuides, buildOption, normalizeState, validateSeries, validateWindow } from "./option.js";
 import { groupColors } from "./colors.js";
+import { createLegend } from "./legend.js";
 import { onSchemeChange, palettes, prefersDark } from "./palette.js";
 import type { TimeChart, TimeChartOptions, TimeWindow } from "./types.js";
 
@@ -58,6 +59,7 @@ export function createTimeChart(el: HTMLElement, options: TimeChartOptions): Tim
   function render() {
     refreshGeometry();
     chart.setOption(buildOption(state) as unknown as echarts.EChartsCoreOption, rendered ? { replaceMerge: ["series"], silent: true } : { notMerge: true, silent: true });
+    legend.render(state);
     rendered = true;
   }
   function refreshGuides() {
@@ -74,16 +76,15 @@ export function createTimeChart(el: HTMLElement, options: TimeChartOptions): Tim
     clearTimeout(windowTimer);
     windowTimer = setTimeout(() => { windowTimer = undefined; if (!destroyed) { const w = getWindow(); options.onWindowChange?.(w.start, w.end); } }, 150);
   }
-  function onLegend(input: unknown) {
-    if (typeof input !== "object" || input === null || !("name" in input) || typeof input.name !== "string" || !("selected" in input) || typeof input.selected !== "object" || input.selected === null) return;
-    const event = { name: input.name, selected: input.selected as Record<string, boolean> };
-    if (!state.series.some(s => s.id === event.name)) return;
-    const visible = event.selected[event.name] === true;
-    if (visible) state.hidden.delete(event.name); else state.hidden.add(event.name);
-    state.window = getWindow(); render(); options.onLegendToggle?.(event.name, visible);
+  function toggle(id: string) {
+    if (destroyed || !state.series.some(s => s.id === id)) return;
+    const visible = state.hidden.has(id);
+    if (visible) state.hidden.delete(id); else state.hidden.add(id);
+    state.window = getWindow(); render(); options.onLegendToggle?.(id, visible);
   }
+  const legend = createLegend(el, toggle);
   setPalette(options.theme === "dark" || (options.theme !== "light" && prefersDark())); render();
-  chart.on("datazoom", onZoom); chart.on("legendselectchanged", onLegend);
+  chart.on("datazoom", onZoom);
   const unsubscribe = options.theme === undefined || options.theme === "auto" ? onSchemeChange(dark => { state.window = getWindow(); setPalette(dark); render(); }) : () => undefined;
   const clock = setInterval(refreshGuides, 60_000);
   function resize() { assertLive(); chart.resize(); scheduleGuides(); }
@@ -111,7 +112,7 @@ export function createTimeChart(el: HTMLElement, options: TimeChartOptions): Tim
       if (destroyed) return;
       destroyed = true; clearTimeout(guideTimer); clearTimeout(windowTimer); clearInterval(clock);
       unsubscribe(); observer?.disconnect(); if (!observer) window.removeEventListener("resize", resize);
-      chart.off("datazoom", onZoom); chart.off("legendselectchanged", onLegend); chart.dispose();
+      chart.off("datazoom", onZoom); legend.destroy(); chart.dispose();
       if (group) {
         const count = (links.get(group) ?? 1) - 1;
         if (count === 0) { links.delete(group); echarts.disconnect(group); } else links.set(group, count);

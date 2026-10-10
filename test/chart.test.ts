@@ -22,9 +22,14 @@ function create(extra = {}) {
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
   vi.stubGlobal("ResizeObserver", class { observe = mock.observer; disconnect = mock.disconnect; });
   vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener: (_: string, cb: typeof mock.media) => { mock.media = cb; }, removeEventListener: mock.remove }));
-  return createTimeChart(document.createElement("div"), { series, ...extra });
+  host = document.body.appendChild(document.createElement("div"));
+  return createTimeChart(host, { series, ...extra });
 }
-afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); mock.handlers.clear(); mock.option = {}; vi.restoreAllMocks(); vi.clearAllMocks(); });
+let host: HTMLDivElement;
+const two = [series[0], { id: "b", label: "Beta", points: series[0].points }];
+const legend = () => host.querySelector<HTMLElement>("[data-time-chart-legend]")!;
+const rows = () => Array.from(legend().querySelectorAll<HTMLElement>("[data-series-id]"));
+afterEach(() => { host?.remove(); vi.useRealTimers(); vi.unstubAllGlobals(); mock.handlers.clear(); mock.option = {}; vi.restoreAllMocks(); vi.clearAllMocks(); });
 it("preserves window, hidden ids and existing colors across setSeries", () => {
   const chart = create(); chart.setWindow(100, 900); chart.setHidden(["a"]);
   const before = mock.option.series; chart.setSeries([...series, { ...series[0], id: "b" }]);
@@ -50,4 +55,30 @@ it("refreshes now without moving the window", () => {
 it("follows live theme and tears down timers, observers and listeners", () => {
   const chart = create(); mock.media?.({ matches: true }); expect(mock.option.tooltip).toMatchObject({ backgroundColor: "rgba(29,32,39,0.97)" });
   chart.destroy(); chart.destroy(); expect(vi.getTimerCount()).toBe(0); expect(mock.disconnect).toHaveBeenCalledOnce(); expect(mock.remove).toHaveBeenCalledOnce(); expect(mock.disposed).toBe(true);
+});
+it("lists every series in a legend that scrolls, spanning exactly the plot height", () => {
+  const chart = create({ series: two, legend: { width: 300 } });
+  expect(rows().map(r => [r.dataset.seriesId, r.textContent, r.title])).toEqual([["a", "Alpha", "Alpha"], ["b", "Beta", "Beta"]]);
+  expect(legend().style).toMatchObject({ position: "absolute", top: "64px", bottom: "44px", right: "8px", width: "284px", overflowY: "auto", overscrollBehavior: "contain", paddingRight: "12px" });
+  expect(host.style.position).toBe("relative");
+  expect(mock.option.legend).toMatchObject({ show: false }); chart.destroy();
+});
+it("toggles a series on click, keeps the scroll position, and reports it", () => {
+  const onLegendToggle = vi.fn(), chart = create({ series: two, onLegendToggle });
+  legend().scrollTop = 30; rows()[1].click();
+  expect(mock.option.legend).toMatchObject({ selected: { a: true, b: false } });
+  expect(rows().map(r => r.getAttribute("aria-checked"))).toEqual(["true", "false"]);
+  expect(onLegendToggle).toHaveBeenCalledWith("b", false); expect(legend().scrollTop).toBe(30);
+  rows()[1].click(); expect(onLegendToggle).toHaveBeenLastCalledWith("b", true); chart.destroy();
+});
+it("follows setHidden, setSeries and collapse, and honours show: false", () => {
+  const chart = create({ series: two }); chart.setHidden(["a"]);
+  expect(rows().map(r => r.getAttribute("aria-checked"))).toEqual(["false", "true"]);
+  chart.setSeries([two[1]]); expect(rows().map(r => r.dataset.seriesId)).toEqual(["b"]);
+  chart.setLegendCollapsed(true); expect(legend().style.display).toBe("none");
+  chart.setLegendCollapsed(false); expect(legend().style.display).toBe(""); chart.destroy();
+  create({ legend: { show: false } }); expect(legend().style.display).toBe("none");
+});
+it("removes its legend on destroy", () => {
+  const chart = create(); chart.destroy(); expect(host.querySelector("[data-time-chart-legend]")).toBeNull();
 });

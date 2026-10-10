@@ -61,7 +61,7 @@ The element must have a nonzero size. Times are Unix milliseconds.
 | ~formatTime~     | localized date/time | Formats the tooltip time                       |
 | ~yAxis~          |                     | ~{min, max, name}~; ~max: 'data'~ fixes it at 1.2 × data maximum (default) |
 | ~tooltip~        | ~'axis'~            | ~'axis'~ (all series) or ~'item'~ (one)        |
-| ~legend~         |                     | ~{show, collapsed, width}~, shown on the right |
+| ~legend~         |                     | ~{show, collapsed, width}~, scrolls, on right  |
 | ~link~           |                     | Charts with the same key zoom and pan together |
 | ~onWindowChange~ |                     | Called after the user zooms or pans            |
 | ~onLegendToggle~ |                     | Called when the user toggles a series          |

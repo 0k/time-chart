@@ -54,8 +54,11 @@ export function normalizeState(options: TimeChartOptions, width = 1000, height =
   for (const s of options.series) if (s.color) colors.set(s.id, s.color);
   return { options, series: options.series, window: options.window ? { ...options.window } : dataExtent(options.series, now), colors, hidden: new Set(), highlight: null, legendCollapsed: options.legend?.collapsed ?? false, width, height, now, palette: palettes.light };
 }
+export function legendWidth(state: NormalizedState): number {
+  return state.options.legend?.width ?? 340;
+}
 export function gridRight(state: NormalizedState): number {
-  return state.legendCollapsed || state.options.legend?.show === false ? 24 : (state.options.legend?.width ?? 340) + 24;
+  return state.legendCollapsed || state.options.legend?.show === false ? 24 : legendWidth(state) + 24;
 }
 
 function valueExtent(series: TimeSeries[]): { min: number; max: number } {
@@ -146,15 +149,9 @@ export function buildOption(state: NormalizedState) {
       axisLabel: { color: p.axisLabel, formatter: formatValue }, splitLine: { lineStyle: { color: p.splitLine } },
     },
     dataZoom: [{ type: "inside" as const, xAxisIndex: 0, filterMode: "none", startValue: state.window.start, endValue: state.window.end, zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false }],
-    legend: {
-      // Solid swatch: the default empty circle is filled white, glaring on dark.
-      icon: "roundRect", show: options.legend?.show !== false && !state.legendCollapsed, type: "scroll", orient: "vertical", data: state.series.map(s => s.id),
-      selected: Object.fromEntries(state.series.map(s => [s.id, !state.hidden.has(s.id)])), formatter: (id: string) => labels.get(id) ?? id,
-      right: 8, top: GRID_TOP, bottom: 8, width: (options.legend?.width ?? 340) - 16, itemWidth: 18, itemGap: 6,
-      textStyle: { fontSize: 11, width: (options.legend?.width ?? 340) - 48, overflow: "truncate", ellipsis: "…", color: p.legendText },
-      tooltip: { show: true, formatter: (param: { name?: string }) => escapeHtml(labels.get(param.name ?? "") ?? "") },
-      pageButtonItemGap: 4, pageIconSize: 11, pageTextStyle: { fontSize: 10, color: p.legendPage },
-    },
+    // Never drawn: legend.ts shows a scrolling HTML legend instead.  The
+    // component stays for `selected`, which hides the deselected series.
+    legend: { show: false, data: state.series.map(s => s.id), selected: Object.fromEntries(state.series.map(s => [s.id, !state.hidden.has(s.id)])) },
     tooltip: {
       trigger: options.tooltip ?? "axis", confine: true, backgroundColor: p.tooltipBg, borderColor: p.tooltipBorder, borderWidth: 1, textStyle: { color: p.tooltipText, fontSize: 12 },
       formatter: (input: TooltipRow | TooltipRow[]) => {

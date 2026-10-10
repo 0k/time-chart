@@ -32,12 +32,13 @@ it("sorts and formats visible tooltip rows and escapes host strings", () => {
 });
 it("uses ids in legend so duplicate display labels remain independent", () => {
   const o = buildOption(normalizeState({ series: [series[0], { ...series[0], id: "b" }] }));
-  expect(o.legend.data).toEqual(["a", "b"]); expect(o.legend.formatter("b")).toBe("Alpha");
+  expect(o.legend.data).toEqual(["a", "b"]);
 });
 it("applies highlight proportions and collapse insets", () => {
   const state = normalizeState({ series }); state.highlight = new Set(); state.legendCollapsed = true;
   const o = buildOption(state); expect("lineStyle" in o.series[0] && o.series[0].lineStyle).toMatchObject({ width: 0.5, opacity: 0.7 }); expect(o.grid.right).toBe(24);
 });
-it("draws legend icons as solid swatches, never the white-filled default circle", () => {
-  expect(buildOption(normalizeState({ series })).legend.icon).toBe("roundRect");
+it("never draws the paging canvas legend, only uses it to hide deselected series", () => {
+  const state = normalizeState({ series }); state.hidden.add("a");
+  expect(buildOption(state).legend).toEqual({ show: false, data: ["a"], selected: { a: false } });
 });

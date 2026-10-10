@@ -47,14 +47,12 @@ with sync_playwright() as p:
     page.screenshot(path=str(OUT / "zoomed-in-week.png"), full_page=True)
     print("PASS day labels, weekend bands and now in week")
 
-    # Click a real canvas legend item using its rendered geometry.
-    band_box = page.locator("#bands").bounding_box()
-    assert band_box
-    target = page.evaluate("window.__legendTarget(1, 'observation-0')")
-    page.locator("#bands canvas").click(position={"x": target["x"], "y": target["y"]})
+    # The scrolling HTML legend owns the user interaction.
+    band_row = page.locator('#bands [data-series-id="observation-0"]')
+    band_row.click()
     page.wait_for_function("window.__instances[1].getOption().legend[0].selected['observation-0'] === false")
     assert page.evaluate("window.__instances[1].getOption().series.filter(s => s.id.includes('band:observation-0')).every(s => s.data.length === 0)")
-    page.locator("#bands canvas").click(position={"x": target["x"], "y": target["y"]})
+    band_row.click()
     page.wait_for_function("window.__instances[1].getOption().legend[0].selected['observation-0'] === true")
     assert page.evaluate("window.__instances[1].getOption().series.filter(s => s.id.includes('band:observation-0')).every(s => s.data.length > 0)")
     print("PASS legend hides/restores series and band")

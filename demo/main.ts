@@ -44,26 +44,9 @@ declare global {
     __charts: TimeChart[];
     __instances: EChartsType[];
     __callbackCount: () => number;
-    __legendTarget: (index: number, id: string) => { x: number; y: number };
   }
 }
 window.__charts = charts;
 window.__instances = elements.map(el => { const instance = getInstanceByDom(el); if (!instance) throw new Error("Demo chart did not initialize"); return instance; });
 window.__callbackCount = () => callbackCount;
-// Canvas legends have no DOM nodes; return the actual rendered item's geometry.
-window.__legendTarget = (index, id) => {
-  const instance = window.__instances[index];
-  const legend = instance.getOption().legend as { data: (string | { name: string })[] }[];
-  const dataIndex = legend[0].data.findIndex(entry => (typeof entry === "string" ? entry : entry.name) === id);
-  const item = instance.getZr().storage.getDisplayList().find(display => {
-    if (display.silent) return false;
-    for (let element: typeof display | typeof display.parent = display; element; element = element.parent) {
-      if ("__legendDataIndex" in element && element.__legendDataIndex === dataIndex) return true;
-    }
-    return false;
-  });
-  if (!item) throw new Error(`Rendered legend item not found: ${id}`);
-  const rect = item.getBoundingRect().clone(); rect.applyTransform(item.transform);
-  return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-};
 window.addEventListener("pagehide", () => charts.forEach(chart => chart.destroy()), { once: true });
