@@ -25,7 +25,7 @@ export interface TimeChartOptions {
   yAxis?: { min?: number | "auto"; max?: number | "data" | "auto"; name?: string; interval?: number; minorInterval?: number };
   window?: TimeWindow;
   tooltip?: "axis" | "item";
-  legend?: { show?: boolean; collapsed?: boolean; width?: number };
+  legend?: { show?: boolean; collapsed?: boolean; width?: number | "auto"; maxWidth?: number };
   link?: string;
   onWindowChange?: (start: number, end: number) => void;
   onLegendToggle?: (id: string, visible: boolean) => void;

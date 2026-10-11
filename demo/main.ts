@@ -39,12 +39,12 @@ const elements = ["stacked", "bands", "gaps", "temperature"].map(id => {
 });
 let callbackCount = 0;
 const charts = [stacked, banded, gaps].map((series, i) => createTimeChart(elements[i], {
-  series, link: "demo", locale: "en-GB", legend: { width: 280 }, yAxis: { max: "data", name: i === 0 ? "Bytes" : "Value" },
+  series, link: "demo", locale: "en-GB", legend: { width: "auto" }, yAxis: { max: "data", name: i === 0 ? "Bytes" : "Value" },
   formatValue: i === 0 ? v => `${(v / 1024 / 1024).toFixed(1)} MiB` : v => v.toFixed(2),
   onWindowChange: (a, b) => { callbackCount++; document.querySelector("output")!.textContent = `${new Date(a).toLocaleString()} — ${new Date(b).toLocaleString()}`; },
 }));
 charts.push(createTimeChart(elements[3], {
-  series: temperature, locale: "en-GB", legend: { width: 280 },
+  series: temperature, locale: "en-GB", legend: { width: "auto" },
   yAxis: { min: 0, max: 23, name: "Temperature (°C)", interval: 1, minorInterval: 0.5 },
   formatValue: v => v.toFixed(1),
 }));

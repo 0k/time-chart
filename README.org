@@ -68,12 +68,24 @@ The element must have a nonzero size. Times are Unix milliseconds.
 | ~yAxis.interval~ | automatic           | Finite positive major tick and label step |
 | ~yAxis.minorInterval~ | disabled       | Finite positive minor tick step with dashed minor split lines; requires ~interval~ and must divide it into an integer count from 2 to 99 |
 | ~tooltip~        | ~'axis'~            | ~'axis'~ (all series) or ~'item'~ (one)        |
-| ~legend~         |                     | ~{show, collapsed, width}~, scrolls, on right  |
-| ~link~           |                     | Charts with the same key zoom and pan together |
+| ~legend~         |                     | ~{show, collapsed, width, maxWidth}~, scrolls, on right |
+| ~legend.width~   | ~340~               | Column width in pixels, or ~'auto'~ to fit the widest label |
+| ~legend.maxWidth~ | ~240~ for ~'auto'~ | Caps the column; when set, also caps a numeric ~width~ |
+| ~link~           |                     | Charts with the same key zoom, pan and hover together by time; their ~'auto'~ legends share the widest column |
 | ~onWindowChange~ |                     | Called after the user zooms or pans            |
 | ~onLegendToggle~ |                     | Called when the user toggles a series          |
 | ~locale~         | browser locale      | Locale for labels and default formatters       |
 | ~theme~          | ~'auto'~            | ~'auto'~, ~'light'~ or ~'dark'~                |
+
+With ~legend: { width: 'auto' }~ the legend column is as wide as its
+widest label: at least 80 pixels (less only if ~maxWidth~ is smaller),
+at most ~maxWidth~; longer labels are
+ellipsized and shown in full on hover. Labels are measured again when
+~setSeries~ changes them. Charts sharing a ~link~ key and an ~'auto'~
+legend all take the widest column of the group, each within its own
+~maxWidth~, so with the same ~maxWidth~ their plots line up;
+the group adjusts when one of them changes labels or is destroyed. A
+chart with a numeric ~width~ keeps it.
 
 * Methods
 

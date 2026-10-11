@@ -23,7 +23,14 @@ export interface NormalizedState {
   now: number;
   palette: Palette;
   hatch?: { image: HTMLCanvasElement; repeat: "repeat" };
+  /** Widest legend label in px, measured when labels change (auto width). */
+  legendLabelWidth: number;
+  /** Widest auto column of the chart's link group, if linked. */
+  legendLinkedWidth?: number;
 }
+// Legend column around the label: 18px swatch + 6px gap + 12px scrollbar
+// gutter + 8px right margin + 8px gap to the plot (legend.ts).
+export const LEGEND_CHROME = 52, LEGEND_MIN_WIDTH = 80, LEGEND_MAX_WIDTH = 240;
 
 export function validateWindow(start: number, end: number): void {
   if (!Number.isFinite(start) || !Number.isFinite(end) || start >= end) throw new RangeError("Window must have finite start < end");
@@ -63,12 +70,25 @@ export function normalizeState(options: TimeChartOptions, width = 1000, height =
     if (!Number.isFinite(minorInterval) || minorInterval <= 0 || !Number.isFinite(count) || Math.round(count) < 2 || Math.round(count) > MAX_MINOR_SPLIT || Math.abs(count - Math.round(count)) > Number.EPSILON * Math.max(1, count) * 4) throw new Error(`yAxis minorInterval must divide interval into an integer count from 2 to ${MAX_MINOR_SPLIT}`);
   }
   if (options.window) validateWindow(options.window.start, options.window.end);
+  const legend = options.legend;
+  const positive = (n: unknown) => typeof n === "number" && Number.isFinite(n) && n > 0;
+  if (legend?.width !== undefined && legend.width !== "auto" && !positive(legend.width)) throw new Error(`legend width must be "auto" or a finite positive number, got ${String(legend.width)}`);
+  if (legend?.maxWidth !== undefined && !positive(legend.maxWidth)) throw new Error(`legend maxWidth must be a finite positive number, got ${String(legend.maxWidth)}`);
   const colors = groupColors(options.series);
   for (const s of options.series) if (s.color) colors.set(s.id, s.color);
-  return { options, series: options.series, window: options.window ? { ...options.window } : dataExtent(options.series, now), colors, hidden: new Set(), highlight: null, legendCollapsed: options.legend?.collapsed ?? false, width, height, now, palette: palettes.light };
+  return { options, series: options.series, window: options.window ? { ...options.window } : dataExtent(options.series, now), colors, hidden: new Set(), highlight: null, legendCollapsed: options.legend?.collapsed ?? false, width, height, now, palette: palettes.light, legendLabelWidth: 0 };
 }
+/**
+ * Width of the legend column, from the plot's right edge to the chart's.
+ * A numeric (or default) width is used as is; an explicit `maxWidth` caps
+ * it.  `"auto"` fits the widest label: swatch, gap, scrollbar gutter and
+ * margins add LEGEND_CHROME; linked charts share the group's widest column.
+ */
 export function legendWidth(state: NormalizedState): number {
-  return state.options.legend?.width ?? 340;
+  const { width = 340, maxWidth } = state.options.legend ?? {};
+  if (width !== "auto") return maxWidth === undefined ? width : Math.min(width, maxWidth);
+  const own = Math.max(Math.ceil(state.legendLabelWidth) + LEGEND_CHROME, LEGEND_MIN_WIDTH);
+  return Math.min(Math.max(own, state.legendLinkedWidth ?? 0), maxWidth ?? LEGEND_MAX_WIDTH);
 }
 export function gridRight(state: NormalizedState): number {
   return state.legendCollapsed || state.options.legend?.show === false ? 24 : legendWidth(state) + 24;

@@ -20,6 +20,31 @@ with sync_playwright() as p:
     page.wait_for_function("window.__charts?.length === 4")
     assert page.evaluate("window.__instances.every(c => c.getOption().animation === false)")
     page.screenshot(path=str(OUT / "initial.png"), full_page=True)
+
+    # Auto legends: the unlinked temperature column fits its widest label
+    # exactly; the three linked charts share one column, capped at maxWidth.
+    legends = page.evaluate("""() => window.__instances.map((c, i) => {
+        const root = document.querySelectorAll('[data-time-chart-legend]')[i];
+        const texts = [...root.querySelectorAll('[data-series-id] span:last-child')];
+        return {
+            right: c.getOption().grid[0].right, column: root.getBoundingClientRect().width,
+            // Room left beside each label's laid-out text (a Range measures
+            // the text itself, unlike scrollWidth which never drops below
+            // the box width).
+            slack: Math.min(...texts.map(t => { const r = document.createRange(); r.selectNodeContents(t); return t.clientWidth - r.getBoundingClientRect().width; })),
+            truncated: texts.some(t => t.scrollWidth > t.clientWidth),
+        };
+    })""")
+    temperature = legends[3]
+    print("legends", legends)
+    assert not temperature["truncated"], temperature
+    assert -0.5 <= temperature["slack"] <= 2, f"temperature column not fitted to its widest label: {temperature}"
+    assert temperature["right"] == temperature["column"] + 16 + 24, temperature
+    assert temperature["right"] < 280 + 24 - 100, f"plot did not gain width over the former 280px legend: {temperature}"
+    assert len({l["right"] for l in legends[:3]}) == 1, f"linked plots not aligned: {legends[:3]}"
+    assert legends[0]["right"] == 240 + 24 and legends[0]["truncated"], legends[0]
+    page.screenshot(path=str(OUT / "time-chart-legend-auto.png"), full_page=True)
+    print(f"PASS auto legend widths: temperature column {temperature['column']}px, linked columns {legends[0]['column']}px")
     initial = page.evaluate("window.__charts[0].getWindow()")
     box = page.locator("#stacked").bounding_box()
     assert box

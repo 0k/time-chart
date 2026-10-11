@@ -5,7 +5,12 @@ import { GRID_BOTTOM, GRID_TOP, legendWidth, type NormalizedState } from "./opti
  * lives on the canvas, so it can only page; this one scrolls natively and
  * spans exactly the plot's height.
  */
-export interface Legend { render(state: NormalizedState): void; destroy(): void }
+export interface Legend {
+  render(state: NormalizedState): void;
+  /** Width in px of the widest label, in the legend's own font. */
+  measure(labels: string[]): number;
+  destroy(): void;
+}
 
 const ROW = 14, SWATCH = 18;
 
@@ -39,7 +44,17 @@ export function createLegend(host: HTMLElement, onToggle: (id: string) => void):
     return el;
   }
   host.append(root);
+  let canvas: HTMLCanvasElement | undefined;
   return {
+    measure(labels) {
+      const style = getComputedStyle(root);
+      const size = parseFloat(style.fontSize) || 11;
+      const ctx = (canvas ??= document.createElement("canvas")).getContext("2d");
+      // Without a canvas, estimate an average glyph at 0.6 em.
+      if (!ctx) return Math.max(0, ...labels.map(label => label.length * size * 0.6));
+      ctx.font = `${style.fontStyle || "normal"} ${style.fontWeight || "normal"} ${size}px ${style.fontFamily || "sans-serif"}`;
+      return Math.max(0, ...labels.map(label => ctx.measureText(label).width));
+    },
     render(state) {
       const shown = state.options.legend?.show !== false && !state.legendCollapsed;
       root.style.display = shown ? "" : "none";
@@ -59,6 +74,6 @@ export function createLegend(host: HTMLElement, onToggle: (id: string) => void):
       });
       root.scrollTop = scroll;
     },
-    destroy() { root.remove(); rows.clear(); },
+    destroy() { root.remove(); rows.clear(); canvas = undefined; },
   };
 }

@@ -168,3 +168,31 @@ it("preserves the complete legacy option when new fields are omitted", () => {
   });
   expect(o.tooltip.formatter({ seriesName: "a", value: [0, 2] })).toBe('<div>time</div><div><span style="color:#ca3e2b">●</span> Alpha: 2</div>');
 });
+const right = (legend: object) => buildOption(normalizeState({ series, legend } as Parameters<typeof normalizeState>[0])).grid.right;
+it("keeps a numeric legend width exactly, unless an explicit maxWidth caps it", () => {
+  expect(right({ width: 300 })).toBe(324);
+  expect(right({ width: 300, maxWidth: 200 })).toBe(224);
+  expect(right({ maxWidth: 200 })).toBe(224);
+});
+it("sizes an auto legend from the measured label width, a linked width and maxWidth", () => {
+  const state = normalizeState({ series, legend: { width: "auto" } });
+  state.legendLabelWidth = 100.2;
+  expect(buildOption(state).grid.right).toBe(153 + 24);
+  state.legendLinkedWidth = 200;
+  expect(buildOption(state).grid.right).toBe(200 + 24);
+  state.legendLinkedWidth = 500;
+  expect(buildOption(state).grid.right).toBe(240 + 24);
+});
+it("lets an explicit maxWidth below 80 cap an auto legend, and cap a linked width per chart", () => {
+  const state = normalizeState({ series, legend: { width: "auto", maxWidth: 40 } });
+  state.legendLabelWidth = 100;
+  expect(buildOption(state).grid.right).toBe(40 + 24);
+  state.legendLinkedWidth = 200;
+  expect(buildOption(state).grid.right).toBe(40 + 24);
+});
+it.each([0, -1, NaN, Infinity, "wide"])("rejects legend width %s", width => {
+  expect(() => normalizeState({ series, legend: { width } } as Parameters<typeof normalizeState>[0])).toThrow(/legend width must be "auto" or a finite positive number/);
+});
+it.each([0, -1, NaN, Infinity, "240"])("rejects legend maxWidth %s", maxWidth => {
+  expect(() => normalizeState({ series, legend: { maxWidth } } as Parameters<typeof normalizeState>[0])).toThrow(/legend maxWidth must be a finite positive number/);
+});
