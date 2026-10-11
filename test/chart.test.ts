@@ -3,18 +3,18 @@ import { createTimeChart } from "../src/chart";
 
 const mock = vi.hoisted(() => {
   const handlers = new Map<string, (event: unknown) => void>();
-  return { handlers, charts: [] as { el: HTMLElement; option: Record<string, unknown> }[], disposed: false, observer: vi.fn(), disconnect: vi.fn(), remove: vi.fn(), media: undefined as ((event: { matches: boolean }) => void) | undefined };
+  return { handlers, charts: [] as { el: HTMLElement; option: Record<string, unknown>; handlers: Map<string, (event: unknown) => void>; setOption: ReturnType<typeof vi.fn> }[], disposed: false, observer: vi.fn(), disconnect: vi.fn(), remove: vi.fn(), media: undefined as ((event: { matches: boolean }) => void) | undefined };
 });
 vi.mock("echarts/core", () => ({
   use: vi.fn(), connect: vi.fn(), disconnect: vi.fn(),
   init: (el: HTMLElement) => {
-    const chart = { el, option: {} as Record<string, unknown> };
+    const chart = { el, option: {} as Record<string, unknown>, handlers: new Map<string, (event: unknown) => void>(), setOption: vi.fn((option: Record<string, unknown>) => { chart.option = { ...chart.option, ...option }; }) };
     mock.charts.push(chart);
     return {
-      setOption: vi.fn((option: Record<string, unknown>) => { chart.option = { ...chart.option, ...option }; }),
-      getOption: () => chart.option, getWidth: () => 1000, getHeight: () => 400,
-      on: (name: string, cb: (e: unknown) => void) => mock.handlers.set(name, cb),
-      off: (name: string) => mock.handlers.delete(name), resize: vi.fn(),
+      setOption: chart.setOption,
+      dispatchAction: vi.fn(), getOption: () => chart.option, getWidth: () => 1000, getHeight: () => 400,
+      on: (name: string, cb: (e: unknown) => void) => { mock.handlers.set(name, cb); chart.handlers.set(name, cb); },
+      off: (name: string) => { mock.handlers.delete(name); chart.handlers.delete(name); }, resize: vi.fn(),
       dispose: () => { mock.disposed = true; },
     };
   },
@@ -164,4 +164,14 @@ it("does not link legends of other groups or unlinked charts", () => {
   const c = autoMeasured([labelOf(12)]);
   expect([right(a.el), right(b.el), right(c.el)]).toEqual([30 * 6 + 76, 10 * 6 + 76, 12 * 6 + 76]);
   a.chart.destroy(); b.chart.destroy(); c.chart.destroy();
+});
+
+it("does not redraw or echo a linked user zoom", () => {
+  const a = create({ link: "no-echo" }), b = create({ link: "no-echo" });
+  const [first, second] = mock.charts;
+  first.setOption.mockClear(); second.setOption.mockClear();
+  first.option.dataZoom = [{ startValue: 100, endValue: 900 }];
+  first.handlers.get("datazoom")?.({});
+  expect(first.setOption).not.toHaveBeenCalled(); expect(second.setOption).not.toHaveBeenCalled();
+  a.destroy(); b.destroy();
 });

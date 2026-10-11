@@ -159,7 +159,7 @@ it("preserves the complete legacy option when new fields are omitted", () => {
   const p = state.palette, o = buildOption(state);
   expect(o).toEqual({
     animation: false, grid: { left: 64, top: 64, bottom: 44, right: 364 },
-    xAxis: { type: "time", min: -172_800_000, max: 259_200_000, axisLine: { lineStyle: { color: p.axisLine } }, axisLabel: { color: p.axisLabel, hideOverlap: true }, splitLine: { show: true, lineStyle: { color: p.splitLine } } },
+    xAxis: { type: "time", min: -172_800_000, max: 259_200_000, axisPointer: { show: true, snap: false, triggerTooltip: true }, axisLine: { lineStyle: { color: p.axisLine } }, axisLabel: { color: p.axisLabel, hideOverlap: true }, splitLine: { show: true, lineStyle: { color: p.splitLine } } },
     yAxis: { type: "value", min: 0, max: 12, name: "", nameLocation: "middle", nameGap: 46, nameTextStyle: { color: p.axisName }, axisLabel: { color: p.axisLabel, formatter: state.options.formatValue }, splitLine: { lineStyle: { color: p.splitLine } } },
     dataZoom: [{ type: "inside", xAxisIndex: 0, filterMode: "none", startValue: 0, endValue: 86_400_000, zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false }],
     legend: { show: false, data: ["a"], selected: { a: true } },

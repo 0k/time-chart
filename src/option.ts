@@ -61,6 +61,11 @@ export function dataExtent(series: TimeSeries[], now: number): TimeWindow {
   if (start === Infinity) return { start: now - DAY_MS, end: now };
   return { start, end: end === start ? end + DAY_MS : end };
 }
+/** Full time-axis bounds: the data padded by twice its span, and the window. */
+export function axisExtent(state: NormalizedState): TimeWindow {
+  const extent = dataExtent(state.series, state.now), span = Math.max(extent.end - extent.start, DAY_MS);
+  return { start: Math.min(extent.start - 2 * span, state.window.start), end: Math.max(extent.end + 2 * span, state.window.end) };
+}
 export function normalizeState(options: TimeChartOptions, width = 1000, height = 400, now = Date.now()): NormalizedState {
   validateSeries(options.series);
   const interval = options.yAxis?.interval, minorInterval = options.yAxis?.minorInterval;
@@ -146,7 +151,7 @@ export function buildOption(state: NormalizedState) {
   const lineLess = new Set(state.series.filter(s => s.line === false).map(s => s.id));
   const formatValue = options.formatValue ?? (v => v.toLocaleString(options.locale));
   const formatTime = options.formatTime ?? (t => new Intl.DateTimeFormat(options.locale, { dateStyle: "medium", timeStyle: "short" }).format(t));
-  const extent = dataExtent(state.series, state.now), span = Math.max(extent.end - extent.start, DAY_MS);
+  const extent = axisExtent(state);
   const values = valueExtent(state.series);
   const real = state.series.map(s => {
     const dim = state.highlight !== null && !state.highlight.has(s.id);
@@ -175,7 +180,9 @@ export function buildOption(state: NormalizedState) {
   return {
     animation: false,
     grid: { left: GRID_LEFT, top: GRID_TOP, bottom: GRID_BOTTOM, right: gridRight(state) },
-    xAxis: { type: "time" as const, min: Math.min(extent.start - 2 * span, state.window.start), max: Math.max(extent.end + 2 * span, state.window.end), axisLine: { lineStyle: { color: p.axisLine } }, axisLabel: { color: p.axisLabel, hideOverlap: true }, splitLine: { show: true, lineStyle: { color: p.splitLine } } },
+    // Linked charts point at the hovered time itself (no snapping to a point,
+    // which differs between charts), also with item tooltips.
+    xAxis: { type: "time" as const, min: extent.start, max: extent.end, axisPointer: { show: true, snap: false, triggerTooltip: (options.tooltip ?? "axis") === "axis" }, axisLine: { lineStyle: { color: p.axisLine } }, axisLabel: { color: p.axisLabel, hideOverlap: true }, splitLine: { show: true, lineStyle: { color: p.splitLine } } },
     yAxis: {
       // null (not undefined) means "auto" so merged updates clear an old bound.
       type: "value" as const, min: options.yAxis?.min === "auto" ? null : options.yAxis?.min ?? (values.min >= 0 ? 0 : null),

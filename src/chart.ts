@@ -2,7 +2,7 @@ import * as echarts from "echarts/core";
 import { LineChart } from "echarts/charts";
 import { GridComponent, TooltipComponent, LegendComponent, DataZoomInsideComponent as DataZoomComponent, MarkLineComponent, MarkAreaComponent } from "echarts/components";
 import { CanvasRenderer } from "echarts/renderers";
-import { buildGuides, buildOption, legendWidth, normalizeState, validateSeries, validateWindow } from "./option.js";
+import { GRID_BOTTOM, GRID_TOP, buildGuides, buildOption, legendWidth, normalizeState, validateSeries, validateWindow } from "./option.js";
 import { groupColors } from "./colors.js";
 import { createLegend } from "./legend.js";
 import { onSchemeChange, palettes, prefersDark } from "./palette.js";
@@ -25,8 +25,12 @@ function hatch(stroke: string): HTMLCanvasElement | undefined {
 }
 
 /**
- * Charts sharing a `link` key.  Besides zooming together, their auto-width
- * legends share the group's widest column so their plot areas line up.
+ * Charts sharing a `link` key.  They are linked by time, not by ECharts'
+ * `connect` (which relays zoom percentages and hovered data indices, so
+ * charts with different data or plot widths would disagree): a user zoom or
+ * pan shows the same window on every chart, and a hover points them all at
+ * the same time.  Their auto-width legends share the group's widest column
+ * so their plot areas line up.
  */
 interface LinkMember {
   /** The chart's own auto legend width, or undefined for a fixed width. */
@@ -34,6 +38,10 @@ interface LinkMember {
   /** Takes the group width; returns whether the legend width changed. */
   adopt(width: number | undefined): boolean;
   redraw(): void;
+  /** Shows the window a user chose on another chart of the group. */
+  follow(window: TimeWindow): void;
+  /** Points at the time hovered on another chart; null hides the pointer. */
+  point(t: number | null): void;
 }
 const links = new Map<string, Set<LinkMember>>();
 function syncLegends(group: string, self?: LinkMember) {
@@ -42,6 +50,14 @@ function syncLegends(group: string, self?: LinkMember) {
   const widths = [...members].map(m => m.autoWidth()).filter((w): w is number => w !== undefined);
   const width = widths.length ? Math.max(...widths) : undefined;
   for (const m of members) if (m.adopt(width) && m !== self) m.redraw();
+}
+// Set while a chart passes a user action to its group, so the actions it
+// triggers on the other charts are not passed on again.
+let relaying = false;
+function relay(group: string, self: LinkMember, action: (m: LinkMember) => void) {
+  if (relaying) return;
+  relaying = true;
+  try { for (const m of links.get(group) ?? []) if (m !== self) action(m); } finally { relaying = false; }
 }
 
 export function createTimeChart(el: HTMLElement, options: TimeChartOptions): TimeChart {
@@ -75,9 +91,12 @@ export function createTimeChart(el: HTMLElement, options: TimeChartOptions): Tim
   // series list but merge components: a notMerge update disposes the tooltip
   // view while ECharts' own keep-show timer still references it.
   let rendered = false;
+  let axis: TimeWindow = { start: 0, end: 0 };
   function render() {
     refreshGeometry();
-    chart.setOption(buildOption(state) as unknown as echarts.EChartsCoreOption, rendered ? { replaceMerge: ["series"], silent: true } : { notMerge: true, silent: true });
+    const option = buildOption(state);
+    axis = { start: option.xAxis.min, end: option.xAxis.max };
+    chart.setOption(option as unknown as echarts.EChartsCoreOption, rendered ? { replaceMerge: ["series"], silent: true } : { notMerge: true, silent: true });
     legend.render(state);
     rendered = true;
   }
@@ -90,10 +109,19 @@ export function createTimeChart(el: HTMLElement, options: TimeChartOptions): Tim
     clearTimeout(guideTimer);
     guideTimer = setTimeout(() => { guideTimer = undefined; refreshGuides(); }, 100);
   }
-  function onZoom() {
-    state.window = getWindow(); scheduleGuides();
+  function scheduleWindowChange() {
     clearTimeout(windowTimer);
     windowTimer = setTimeout(() => { windowTimer = undefined; if (!destroyed) { const w = getWindow(); options.onWindowChange?.(w.start, w.end); } }, 150);
+  }
+  function onZoom() {
+    state.window = getWindow(); scheduleGuides(); scheduleWindowChange();
+    if (group) relay(group, member, m => m.follow(state.window));
+  }
+  function onPointer(event: unknown) {
+    if (!group || destroyed) return;
+    const axes = (event as { axesInfo?: { axisDim: string; value: number }[] }).axesInfo;
+    const t = axes?.find(a => a.axisDim === "x")?.value;
+    relay(group, member, m => m.point(typeof t === "number" ? t : null));
   }
   function toggle(id: string) {
     if (destroyed || !state.series.some(s => s.id === id)) return;
@@ -119,17 +147,38 @@ export function createTimeChart(el: HTMLElement, options: TimeChartOptions): Tim
       return legendWidth(state) !== before;
     },
     redraw() { if (!destroyed) { state.window = getWindow(); render(); } },
+    follow(window) {
+      if (destroyed) return;
+      state.window = { ...window };
+      // Within the drawn axis, only the zoom moves; beyond it, the axis grows.
+      if (window.start >= axis.start && window.end <= axis.end) chart.dispatchAction({ type: "dataZoom", dataZoomIndex: 0, startValue: window.start, endValue: window.end }, { silent: true });
+      else render();
+      scheduleGuides(); scheduleWindowChange();
+    },
+    point(t) {
+      if (destroyed) return;
+      // Outside the time span of its points (not dataExtent, which pads empty
+      // or single-point data) the chart has nothing to show: no pointer.
+      const times = state.series.flatMap(s => s.points.length ? [s.points[0][0], s.points[s.points.length - 1][0]] : []);
+      if (t === null || !times.length || t < Math.max(state.window.start, Math.min(...times)) || t > Math.min(state.window.end, Math.max(...times))) {
+        chart.dispatchAction({ type: "updateAxisPointer", currTrigger: "leave" });
+        return;
+      }
+      // The axis pointer also opens the tooltip of an "axis" trigger.
+      const x = chart.convertToPixel({ xAxisIndex: 0 }, t) as number;
+      chart.dispatchAction({ type: "updateAxisPointer", x, y: GRID_TOP + (state.height - GRID_TOP - GRID_BOTTOM) / 2 });
+    },
   };
   setPalette(options.theme === "dark" || (options.theme !== "light" && prefersDark()));
   measureLegend();
   if (group) {
-    chart.group = group;
     const members = links.get(group) ?? new Set<LinkMember>();
-    links.set(group, members.add(member)); echarts.connect(group);
+    links.set(group, members.add(member));
     syncLegends(group, member);
   }
   render();
   chart.on("datazoom", onZoom);
+  chart.on("updateaxispointer", onPointer);
   const unsubscribe = options.theme === undefined || options.theme === "auto" ? onSchemeChange(dark => { state.window = getWindow(); setPalette(dark); render(); }) : () => undefined;
   const clock = setInterval(refreshGuides, 60_000);
   function resize() { assertLive(); chart.resize(); scheduleGuides(); }
@@ -159,11 +208,11 @@ export function createTimeChart(el: HTMLElement, options: TimeChartOptions): Tim
       if (destroyed) return;
       destroyed = true; clearTimeout(guideTimer); clearTimeout(windowTimer); clearInterval(clock);
       unsubscribe(); observer?.disconnect(); if (!observer) window.removeEventListener("resize", resize);
-      chart.off("datazoom", onZoom); legend.destroy(); chart.dispose();
+      chart.off("datazoom", onZoom); chart.off("updateaxispointer", onPointer); legend.destroy(); chart.dispose();
       if (group) {
         const members = links.get(group);
         members?.delete(member);
-        if (!members?.size) { links.delete(group); echarts.disconnect(group); } else syncLegends(group);
+        if (!members?.size) links.delete(group); else syncLegends(group);
       }
     },
   };

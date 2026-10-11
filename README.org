@@ -87,6 +87,18 @@ legend all take the widest column of the group, each within its own
 the group adjusts when one of them changes labels or is destroyed. A
 chart with a numeric ~width~ keeps it.
 
+Charts sharing a ~link~ key are linked by time: after a user zoom or pan
+they all show the same time window, and hovering one puts the others'
+pointers at the same time, even when their data covers different ranges
+or different timestamps. With ~tooltip: 'axis'~ each linked chart also
+shows its tooltip, with the values of its own points nearest to that
+time; with ~'item'~ only the pointer is linked. A chart hides its pointer
+when the time is outside the span of its points or outside its window.
+~onWindowChange~ fires on every affected chart after 150 ms without
+another zoom or pan, with that chart's current window.
+~setWindow~ changes only the receiving chart and never fires the callback;
+set it on each linked chart when choosing a range programmatically.
+
 * Methods
 
 | Method                     | Description                                   |

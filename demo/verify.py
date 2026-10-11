@@ -19,6 +19,8 @@ with sync_playwright() as p:
     page.wait_for_selector("#stacked canvas")
     page.wait_for_function("window.__charts?.length === 4")
     assert page.evaluate("window.__instances.every(c => c.getOption().animation === false)")
+    assert page.evaluate("window.__instances[0].getOption().series[0].data[0][0] !== window.__instances[1].getOption().series[0].data[0][0]")
+    assert page.evaluate("new Set(window.__charts.slice(0, 3).map(c => JSON.stringify(c.getWindow()))).size === 1")
     page.screenshot(path=str(OUT / "initial.png"), full_page=True)
 
     # Auto legends: the unlinked temperature column fits its widest label
@@ -63,7 +65,59 @@ with sync_playwright() as p:
     page.mouse.move(x + 100, y, steps=12)
     page.mouse.up()
     page.wait_for_function("old => Math.abs(window.__charts[0].getWindow().start - old.start) > 1000", arg=zoom)
-    print("PASS wheel zoom/link and drag pan")
+    same_windows = """() => {
+        const first = window.__charts[0].getWindow();
+        return window.__charts.slice(0, 3).every(c => {
+            const w = c.getWindow();
+            return Math.abs(w.start - first.start) < 10 && Math.abs(w.end - first.end) < 10;
+        });
+    }"""
+    page.wait_for_function(same_windows)
+    page.evaluate("window.__instances[1].dispatchAction({type: 'dataZoom', start: 40, end: 60})")
+    page.wait_for_function(same_windows)
+    print("PASS wheel zoom/link, drag pan and reverse zoom with different data ranges")
+
+    # Linked hover is by time: hovering the stacked chart points each linked
+    # chart at the same time, with its tooltip beside its own pointer, or shows
+    # nothing where that chart has no data (the bands start mid-range).
+    page.evaluate("""() => { window.__pointers = [[], [], []]; window.__instances.slice(0, 3).forEach((c, i) =>
+        c.on('updateAxisPointer', e => window.__pointers[i].push((e.axesInfo || []).find(a => a.axisDim === 'x')?.value ?? null))); }""")
+    page.locator("#month").click()
+    page.wait_for_timeout(300)
+    bands_data = page.evaluate("""() => { const t = window.__instances[1].getOption().series.filter(s => !String(s.id).startsWith('\\u0000')).flatMap(s => s.data.map(p => p[0]));
+        return [Math.min(...t), Math.max(...t)]; }""")
+    stacked = page.locator("#stacked").bounding_box()
+    shown, expected = [], []
+    for frac in (0.05, 0.5, 0.95):
+        page.evaluate("window.__pointers.forEach(p => p.length = 0)")
+        page.mouse.move(stacked["x"] + grid["left"] + (stacked["width"] - grid["left"] - grid["right"]) * frac, stacked["y"] + grid["top"] + 70)
+        page.wait_for_timeout(200)
+        hover = page.evaluate("""() => {
+            const tip = id => [...document.querySelectorAll('#' + id + ' div')].find(d => /pointer-events: none/.test(d.getAttribute('style') || '')
+                && getComputedStyle(d).display !== 'none' && getComputedStyle(d).opacity !== '0' && d.innerText.trim());
+            const box = id => document.getElementById(id).getBoundingClientRect().left;
+            return [0, 1, 2].map(i => {
+                const t = window.__pointers[i].at(-1) ?? null, id = ['stacked', 'bands', 'gaps'][i];
+                const el = tip(id);
+                return { t, px: t === null ? null : window.__instances[i].convertToPixel({ xAxisIndex: 0 }, t), tip: el ? el.getBoundingClientRect().left - box(id) : null };
+            });
+        }""")
+        source = hover[0]["t"]
+        assert source is not None, hover
+        for peer in hover[1:]:
+            if peer["t"] is None:
+                continue
+            shown.append(frac)
+            assert abs(peer["t"] - source) <= 2 * 3600_000, f"linked pointer at another time: {hover}"
+            assert peer["tip"] is not None and abs(peer["tip"] - peer["px"]) < 160, f"linked tooltip away from its pointer: {hover}"
+        inside = bands_data[0] <= source <= bands_data[1]
+        expected.append(inside)
+        assert (hover[1]["t"] is not None) == inside, f"bands pointer shown outside its data or hidden inside it: {bands_data} {hover}"
+    assert set(expected) == {True, False}, f"hover did not cover both inside and outside the bands data: {expected}"
+    page.mouse.move(stacked["x"] + 5, stacked["y"] + 5)
+    page.wait_for_timeout(200)
+    assert page.evaluate("window.__pointers.slice(1).every(p => p.at(-1) === null || p.at(-1) === undefined)")
+    print("PASS linked hover points every chart at the hovered time")
 
     page.locator("#week").click()
     page.wait_for_function("window.__instances[0].getOption().series.at(-1).markLine.data.some(pair => pair[0].label.show && pair[0].label.fontSize === 10)")

@@ -26,7 +26,9 @@ export interface TimeChartOptions {
   window?: TimeWindow;
   tooltip?: "axis" | "item";
   legend?: { show?: boolean; collapsed?: boolean; width?: number | "auto"; maxWidth?: number };
+  /** User zoom/pan and hover are linked by time. */
   link?: string;
+  /** Debounced 150ms after user zoom/pan, including linked peers; not setWindow. */
   onWindowChange?: (start: number, end: number) => void;
   onLegendToggle?: (id: string, visible: boolean) => void;
   locale?: string;

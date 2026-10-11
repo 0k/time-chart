@@ -11,9 +11,11 @@ const stacked: TimeSeries[] = Array.from({ length: 14 }, (_, j) => ({
   id: `component-${j}`, label: `Component ${String(j + 1).padStart(2, "0")} / deterministic telemetry`, group: `group-${Math.floor(j / 3)}`,
   stack: true, points: times.map((t, i) => [t, Math.round(waves(i, j) * (j + 1) * 1024 * 1024)]),
 }));
+// Different data extents must not move linked charts to different windows.
+const bandTimes = times.slice(Math.floor(times.length / 2));
 const banded: TimeSeries[] = [0, 1, 2].map(j => ({
-  id: `observation-${j}`, label: `Observation ${j + 1}`, points: times.map((t, i) => [t, waves(i, j) * (j + 1)]),
-  min: times.map((_, i) => waves(i, j) * (j + 1) - 0.3), max: times.map((_, i) => waves(i, j) * (j + 1) + 0.3),
+  id: `observation-${j}`, label: `Observation ${j + 1}`, points: bandTimes.map((t, i) => [t, waves(i, j) * (j + 1)]),
+  min: bandTimes.map((_, i) => waves(i, j) * (j + 1) - 0.3), max: bandTimes.map((_, i) => waves(i, j) * (j + 1) + 0.3),
 }));
 const gaps: TimeSeries[] = [0, 1].map(j => ({
   id: `signal-${j}`, label: `Signal ${j + 1} / missing intervals`,
@@ -39,7 +41,7 @@ const elements = ["stacked", "bands", "gaps", "temperature"].map(id => {
 });
 let callbackCount = 0;
 const charts = [stacked, banded, gaps].map((series, i) => createTimeChart(elements[i], {
-  series, link: "demo", locale: "en-GB", legend: { width: "auto" }, yAxis: { max: "data", name: i === 0 ? "Bytes" : "Value" },
+  series, window: { start, end: now }, link: "demo", locale: "en-GB", legend: { width: "auto" }, yAxis: { max: "data", name: i === 0 ? "Bytes" : "Value" },
   formatValue: i === 0 ? v => `${(v / 1024 / 1024).toFixed(1)} MiB` : v => v.toFixed(2),
   onWindowChange: (a, b) => { callbackCount++; document.querySelector("output")!.textContent = `${new Date(a).toLocaleString()} — ${new Date(b).toLocaleString()}`; },
 }));
