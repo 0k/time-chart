@@ -19,7 +19,22 @@ const gaps: TimeSeries[] = [0, 1].map(j => ({
   id: `signal-${j}`, label: `Signal ${j + 1} / missing intervals`,
   points: times.map((t, i) => [t, i % 2500 > 1600 ? null : waves(i, j) * (j + 1)]),
 }));
-const elements = ["stacked", "bands", "gaps"].map(id => {
+const temperatureTimes = Array.from({ length: 289 }, (_, i) => now - 2 * DAY + i * DAY / 144);
+const selected = temperatureTimes.map((_, i) => i % 144 >= 36 && i % 144 < 120 ? 20 : 16);
+const current = temperatureTimes.map((_, i) => 18 + 2.5 * Math.sin(i * Math.PI / 72 - Math.PI / 2));
+const temperature: TimeSeries[] = [
+  { id: "confort", label: "confort", color: "yellow", fill: 0.1, points: temperatureTimes.map(t => [t, 21]) },
+  { id: "reduit", label: "reduit", color: "blue", fill: 0.1, points: temperatureTimes.map(t => [t, 16]) },
+  { id: "hors-gel", label: "hors-gel", color: "black", fill: 0.2, points: temperatureTimes.map(t => [t, 7]) },
+  { id: "target", label: "target", color: "orange", dash: "dashed", width: 1, points: temperatureTimes.map((t, i) => [t, selected[i] + 0.6]) },
+  { id: "selected", label: "selected", color: "red", dash: "dotted", width: 3, points: temperatureTimes.map((t, i) => [t, selected[i]]) },
+  { id: "current", label: "current", color: "black", width: 3, points: temperatureTimes.map((t, i) => [t, current[i]]) },
+  { id: "deficit", label: "current <= selected", color: "red", line: false, band: { pattern: "hatch", opacity: 0.8 },
+    points: temperatureTimes.map((t, i) => [t, current[i] <= selected[i] ? current[i] : null]),
+    min: current.map((v, i) => v <= selected[i] ? v : null), max: selected.map((v, i) => current[i] <= v ? v : null) },
+  { id: "heating", label: "heating", color: "red", points: temperatureTimes.map((t, i) => [t, Math.max(selected[i] - current[i], 0)]) },
+];
+const elements = ["stacked", "bands", "gaps", "temperature"].map(id => {
   const el = document.getElementById(id); if (!el) throw new Error(`Missing demo element ${id}`); return el;
 });
 let callbackCount = 0;
@@ -28,8 +43,13 @@ const charts = [stacked, banded, gaps].map((series, i) => createTimeChart(elemen
   formatValue: i === 0 ? v => `${(v / 1024 / 1024).toFixed(1)} MiB` : v => v.toFixed(2),
   onWindowChange: (a, b) => { callbackCount++; document.querySelector("output")!.textContent = `${new Date(a).toLocaleString()} — ${new Date(b).toLocaleString()}`; },
 }));
+charts.push(createTimeChart(elements[3], {
+  series: temperature, locale: "en-GB", legend: { width: 280 },
+  yAxis: { min: 0, max: 23, name: "Temperature (°C)", interval: 1, minorInterval: 0.5 },
+  formatValue: v => v.toFixed(1),
+}));
 
-function setRange(days: number) { for (const chart of charts) chart.setWindow(now - days * DAY + DAY / 2, now + DAY / 2); }
+function setRange(days: number) { for (const chart of charts.slice(0, 3)) chart.setWindow(now - days * DAY + DAY / 2, now + DAY / 2); }
 document.getElementById("week")!.onclick = () => setRange(6);
 document.getElementById("month")!.onclick = () => setRange(30);
 document.getElementById("year")!.onclick = () => setRange(365);

@@ -17,7 +17,7 @@ with sync_playwright() as p:
     page.on("pageerror", lambda exc: errors.append(f"{exc}\n{exc.stack}"))
     page.goto(URL, wait_until="networkidle")
     page.wait_for_selector("#stacked canvas")
-    page.wait_for_function("window.__charts?.length === 3")
+    page.wait_for_function("window.__charts?.length === 4")
     assert page.evaluate("window.__instances.every(c => c.getOption().animation === false)")
     page.screenshot(path=str(OUT / "initial.png"), full_page=True)
     initial = page.evaluate("window.__charts[0].getWindow()")
@@ -68,6 +68,79 @@ with sync_playwright() as p:
     assert page.evaluate("window.__charts[0].getWindow()") == before_dark
     page.screenshot(path=str(OUT / "dark.png"), full_page=True)
     print("PASS year density and live dark theme without window movement")
+
+    for theme in ("light", "dark"):
+        page.emulate_media(color_scheme=theme)
+        expected_bg = "rgb(255, 255, 255)" if theme == "light" else "rgb(22, 24, 29)"
+        page.wait_for_function("bg => getComputedStyle(document.body).backgroundColor === bg", arg=expected_bg)
+        page.wait_for_function("dark => window.__instances[3].getOption().tooltip[0].backgroundColor === (dark ? 'rgba(29,32,39,0.97)' : 'rgba(255,255,255,0.97)')", arg=theme == "dark")
+        page.wait_for_selector("#temperature canvas")
+        assert page.evaluate("""() => {
+            const c = window.__instances[3], o = c.getOption();
+            const s = id => o.series.find(s => s.id === id);
+            return s('target').lineStyle.type === 'dashed' && s('target').lineStyle.width === 1
+                && s('selected').lineStyle.type === 'dotted' && s('selected').lineStyle.width === 3
+                && s('current').lineStyle.width === 3 && s('current').color === 'black'
+                && ['confort', 'reduit', 'hors-gel'].every(id => s(id).areaStyle.origin === 'start' && !s(id).stack)
+                && s('confort').areaStyle.opacity === .1 && s('reduit').areaStyle.opacity === .1 && s('hors-gel').areaStyle.opacity === .2
+                && s('deficit').lineStyle.width === 0 && s('deficit').tooltip.show === false
+                && s('\\u0000band:deficit:1').areaStyle.decal.color === 'red'
+                && o.yAxis[0].interval === 1 && o.yAxis[0].minorTick.show && o.yAxis[0].minorTick.splitNumber === 2
+                && o.yAxis[0].minorSplitLine.show && o.yAxis[0].minorSplitLine.lineStyle.type === 'dashed'
+                && c.getZr().storage.getDisplayList().some(el => el.type === 'ec-polygon' && el.style.decal?.image)
+                && o.tooltip[0].formatter([{seriesName: 'deficit', value: [0, 18]}]) === '';
+        }""")
+        assert page.evaluate("""() => {
+            const o = window.__instances[3].getOption(), s = id => o.series.find(s => s.id === id);
+            return s('heating').data.every(([t, v], i) => v === Math.max(s('selected').data[i][1] - s('current').data[i][1], 0))
+                && s('current').data.at(-1)[0] - s('current').data[0][0] === 2 * 86400000
+                && s('\\u0000band:deficit:0').data.every(([t, v], i) => v === (s('current').data[i][1] <= s('selected').data[i][1] ? s('current').data[i][1] : null))
+                && s('\\u0000band:deficit:1').data.every(([t, v], i) => v === (s('current').data[i][1] <= s('selected').data[i][1] ? s('selected').data[i][1] - s('current').data[i][1] : null))
+                && s('\\u0000band:deficit:0').data.some(p => p[1] === null)
+                && s('\\u0000band:deficit:0').data.some(p => p[1] !== null);
+        }""")
+        row = page.locator('#temperature [data-series-id="deficit"]')
+        row.click()
+        page.wait_for_function("window.__instances[3].getOption().series.filter(s => s.id.includes('band:deficit')).every(s => s.data.length === 0)")
+        row.click()
+        page.wait_for_function("window.__instances[3].getOption().series.filter(s => s.id.includes('band:deficit')).every(s => s.data.length > 0)")
+        fill_row = page.locator('#temperature [data-series-id="confort"]')
+        fill_row.click()
+        assert page.evaluate("""() => {
+            const c = window.__instances[3], m = c.getModel(), s = m.getSeries().find(s => s.id === 'confort');
+            let fills = 0; c.getViewOfSeriesModel(s).group.traverse(el => { if (el.type === 'ec-polygon') fills++; });
+            return m.isSeriesFiltered(s) && fills === 0;
+        }""")
+        fill_row.click()
+        assert page.evaluate("""() => {
+            const c = window.__instances[3], m = c.getModel(), s = m.getSeries().find(s => s.id === 'confort');
+            let fills = 0; c.getViewOfSeriesModel(s).group.traverse(el => { if (el.type === 'ec-polygon') fills++; });
+            return !m.isSeriesFiltered(s) && fills === 1;
+        }""")
+        path = OUT / ("time-chart-demo.png" if theme == "light" else "time-chart-demo-dark.png")
+        page.locator("#temperature").screenshot(path=str(path))
+        print(f"PASS temperature {theme}: styles, rendered decal, ticks, tooltip, gaps, heating and legend toggles; {path}")
+    # A fill-only owner is also selectable, without leaking into the tooltip.
+    assert page.evaluate("""() => {
+        const c = window.__charts[3], instance = window.__instances[3], w = c.getWindow();
+        c.setSeries([{id: 'fill-only', label: 'Fill only', points: [[w.start, 3], [w.end, 4]], fill: .5, line: false}]);
+        const s = instance.getOption().series.find(s => s.id === 'fill-only');
+        return s.lineStyle.width === 0 && s.lineStyle.opacity === 0 && s.areaStyle.origin === 'start'
+            && instance.getOption().tooltip[0].formatter([{seriesName: 'fill-only', value: [w.start, 3]}]) === '';
+    }""")
+    row = page.locator('#temperature [data-series-id="fill-only"]')
+    for visible in (False, True):
+        row.click()
+        assert page.evaluate("""visible => {
+            const c = window.__instances[3], m = c.getModel(), s = m.getSeries().find(s => s.id === 'fill-only');
+            let fills = 0; c.getViewOfSeriesModel(s).group.traverse(el => { if (el.type === 'ec-polygon') fills++; });
+            return m.isSeriesFiltered(s) === !visible && fills === (visible ? 1 : 0);
+        }""", visible)
+    assert page.evaluate("""() => {
+        window.__charts.forEach(c => { c.destroy(); c.destroy(); });
+        return window.__instances.every(c => c.isDisposed()) && !document.querySelector('[data-time-chart-legend]');
+    }""")
+    print("PASS fill-only legend toggle, tooltip exclusion and idempotent chart cleanup")
     assert not errors, f"Browser errors: {errors}"
     browser.close()
 print(f"PASS no console errors; screenshots in {OUT}")

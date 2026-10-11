@@ -13,7 +13,7 @@
       --space-1: 4px; --space-2: 8px; --space-3: 12px;
       --space-4: 16px; --space-6: 24px; --space-8: 32px;
       --type-small: 12px; --type-body: 14px; --type-title: 28px;
-      --radius: 4px; --hairline: 1px; --chart-height: 320px;
+      --radius: 4px; --hairline: 1px; --chart-height: 320px; --temperature-height: 480px;
     }
     @media (prefers-color-scheme: dark) { :root {
       --bg: #16181d; --panel: #1d2027; --border: #333842;
@@ -31,18 +31,20 @@
     .section-title { display: flex; justify-content: space-between; align-items: center; padding: 0 var(--space-4); }
     h2 { font-size: var(--type-body); margin: 0; }
     .chart { width: 100%; height: var(--chart-height); }
+    #temperature { height: var(--temperature-height); }
     output { font: var(--type-small) "DejaVu Sans Mono", monospace; color: var(--muted); }
   </style>
 </head>
 <body>
   <header>
     <div><h1>Time, in context.</h1><p>Three linked charts · wheel to zoom · drag to pan · click a legend to hide</p></div>
-    <nav aria-label="Time window"><button id="week">Week</button><button id="month">30 days</button><button id="year">Year</button></nav>
+    <nav aria-label="Time window"><button type="button" id="week">Week</button><button type="button" id="month">30 days</button><button type="button" id="year">Year</button></nav>
   </header>
   <main>
-    <section><div class="section-title"><h2>01 / Stacked bytes</h2><button data-collapse="0" aria-expanded="true">Collapse legend</button></div><div class="chart" id="stacked"></div></section>
-    <section><div class="section-title"><h2>02 / Observations and min–max bands</h2><button data-collapse="1" aria-expanded="true">Collapse legend</button></div><div class="chart" id="bands"></div></section>
-    <section><div class="section-title"><h2>03 / Gaps are not interpolated</h2><button data-collapse="2" aria-expanded="true">Collapse legend</button></div><div class="chart" id="gaps"></div></section>
+    <section><div class="section-title"><h2>01 / Stacked bytes</h2><button type="button" data-collapse="0" aria-expanded="true">Collapse legend</button></div><div class="chart" id="stacked"></div></section>
+    <section><div class="section-title"><h2>02 / Observations and min–max bands</h2><button type="button" data-collapse="1" aria-expanded="true">Collapse legend</button></div><div class="chart" id="bands"></div></section>
+    <section><div class="section-title"><h2>03 / Gaps are not interpolated</h2><button type="button" data-collapse="2" aria-expanded="true">Collapse legend</button></div><div class="chart" id="gaps"></div></section>
+    <section><div class="section-title"><h2>04 / Temperature zone · two days · gnuplot styles</h2><button type="button" data-collapse="3" aria-expanded="true">Collapse legend</button></div><div class="chart" id="temperature"></div></section>
   </main>
   <output id="window" aria-live="polite"></output>
   <script type="module" src="./main.ts"></script>
