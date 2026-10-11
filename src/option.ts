@@ -7,6 +7,8 @@ export const GRID_LEFT = 64, GRID_TOP = 64, GRID_BOTTOM = 44;
 export const GUIDE_ID = "\u0000time-guides";
 const DAY_MS = 86_400_000;
 const RISE = { day: 26, month: 45, year: 65, now: 27 };
+// ECharts draws 5 minor ticks instead of 100 or more.
+const MAX_MINOR_SPLIT = 99;
 
 export interface NormalizedState {
   options: TimeChartOptions;
@@ -54,6 +56,12 @@ export function dataExtent(series: TimeSeries[], now: number): TimeWindow {
 }
 export function normalizeState(options: TimeChartOptions, width = 1000, height = 400, now = Date.now()): NormalizedState {
   validateSeries(options.series);
+  const interval = options.yAxis?.interval, minorInterval = options.yAxis?.minorInterval;
+  if (interval !== undefined && (!Number.isFinite(interval) || interval <= 0)) throw new Error("yAxis interval must be finite and positive");
+  if (minorInterval !== undefined) {
+    const count = (interval ?? NaN) / minorInterval;
+    if (!Number.isFinite(minorInterval) || minorInterval <= 0 || !Number.isFinite(count) || Math.round(count) < 2 || Math.round(count) > MAX_MINOR_SPLIT || Math.abs(count - Math.round(count)) > Number.EPSILON * Math.max(1, count) * 4) throw new Error(`yAxis minorInterval must divide interval into an integer count from 2 to ${MAX_MINOR_SPLIT}`);
+  }
   if (options.window) validateWindow(options.window.start, options.window.end);
   const colors = groupColors(options.series);
   for (const s of options.series) if (s.color) colors.set(s.id, s.color);
@@ -154,6 +162,8 @@ export function buildOption(state: NormalizedState) {
       max: options.yAxis?.max === "auto" ? null : typeof options.yAxis?.max === "number" ? options.yAxis.max : (values.max > 0 ? values.max : 1) * 1.2,
       name: options.yAxis?.name ?? "", nameLocation: "middle", nameGap: 46, nameTextStyle: { color: p.axisName },
       axisLabel: { color: p.axisLabel, formatter: formatValue }, splitLine: { lineStyle: { color: p.splitLine } },
+      ...(options.yAxis?.interval !== undefined ? { interval: options.yAxis.interval } : {}),
+      ...(options.yAxis?.minorInterval !== undefined ? { minorTick: { show: true, splitNumber: Math.round(options.yAxis.interval! / options.yAxis.minorInterval), lineStyle: { color: p.axisLine } }, minorSplitLine: { show: true, lineStyle: { color: p.splitLine, type: "dashed" as const } } } : {}),
     },
     dataZoom: [{ type: "inside" as const, xAxisIndex: 0, filterMode: "none", startValue: state.window.start, endValue: state.window.end, zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false }],
     // Never drawn: legend.ts shows a scrolling HTML legend instead.  The

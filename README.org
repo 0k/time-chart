@@ -64,7 +64,9 @@ The element must have a nonzero size. Times are Unix milliseconds.
 | ~window~         | data extent         | Initial ~{start, end}~ shown                   |
 | ~formatValue~    | localized number    | Formats y-axis labels and tooltip values       |
 | ~formatTime~     | localized date/time | Formats the tooltip time                       |
-| ~yAxis~          |                     | ~{min, max, name}~; ~max: 'data'~ fixes it at 1.2 × data maximum (default) |
+| ~yAxis~          |                     | ~{min, max, name, interval, minorInterval}~; ~max: 'data'~ fixes it at 1.2 × data maximum (default) |
+| ~yAxis.interval~ | automatic           | Finite positive major tick and label step |
+| ~yAxis.minorInterval~ | disabled       | Finite positive minor tick step with dashed minor split lines; requires ~interval~ and must divide it into an integer count from 2 to 99 |
 | ~tooltip~        | ~'axis'~            | ~'axis'~ (all series) or ~'item'~ (one)        |
 | ~legend~         |                     | ~{show, collapsed, width}~, scrolls, on right  |
 | ~link~           |                     | Charts with the same key zoom and pan together |

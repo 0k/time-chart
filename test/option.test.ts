@@ -4,7 +4,8 @@ import * as echarts from "echarts/core";
 import { LineChart } from "echarts/charts";
 import { GridComponent, LegendComponent, MarkAreaComponent, MarkLineComponent } from "echarts/components";
 import { SVGRenderer } from "echarts/renderers";
-import { buildOption, normalizeState } from "../src/option";
+import { buildGuides, buildOption, normalizeState } from "../src/option";
+import { palettes } from "../src/palette";
 import type { TimeChartOptions } from "../src/types";
 
 echarts.use([LineChart, GridComponent, LegendComponent, MarkLineComponent, MarkAreaComponent, SVGRenderer]);
@@ -129,4 +130,41 @@ it("rejects fill combined with stacking", () => {
 });
 it("rejects band styling without bounds", () => {
   expect(() => normalizeState({ series: [{ ...series[0], band: {} }] })).toThrow(/band.*min.*max.*a/i);
+});
+it("sets major ticks without enabling minor ticks", () => {
+  const o = buildOption(normalizeState({ series, yAxis: { interval: 1 } }));
+  expect(o.yAxis).toHaveProperty("interval", 1);
+  expect(o.yAxis).not.toHaveProperty("minorTick");
+});
+it.each([[1, 0.5, 2], [0.3, 0.1, 3], [99, 1, 99]])("subdivides %s ticks by %s", (interval, minorInterval, splitNumber) => {
+  const o = buildOption(normalizeState({ series, yAxis: { interval, minorInterval } }));
+  expect(o.yAxis).toMatchObject({ interval, minorTick: { show: true, splitNumber }, minorSplitLine: { show: true, lineStyle: { type: "dashed" } } });
+});
+it.each(["light", "dark"] as const)("draws minor ticks in the %s palette's axis color", scheme => {
+  const state = normalizeState({ series, yAxis: { interval: 1, minorInterval: 0.5 } });
+  state.palette = palettes[scheme];
+  expect(buildOption(state).yAxis).toMatchObject({ minorTick: { lineStyle: { color: palettes[scheme].axisLine } } });
+});
+it.each([0, -1, NaN, Infinity, -Infinity])("rejects invalid major interval %s", interval => {
+  expect(() => normalizeState({ series, yAxis: { interval } })).toThrow(/interval/i);
+});
+it.each([0, -1, NaN, Infinity, -Infinity, 1, 2, 0.3, 0.01])("rejects invalid minor subdivision %s", minorInterval => {
+  expect(() => normalizeState({ series, yAxis: { interval: 1, minorInterval } })).toThrow(/minorInterval/);
+});
+it("requires an explicit major interval for minor ticks", () => {
+  expect(() => normalizeState({ series, yAxis: { minorInterval: 0.5 } })).toThrow(/minorInterval/);
+});
+it("preserves the complete legacy option when new fields are omitted", () => {
+  const state = normalizeState({ series, locale: "en-GB", formatValue: v => String(v), formatTime: () => "time" }, 1000, 400, 86_400_000);
+  const p = state.palette, o = buildOption(state);
+  expect(o).toEqual({
+    animation: false, grid: { left: 64, top: 64, bottom: 44, right: 364 },
+    xAxis: { type: "time", min: -172_800_000, max: 259_200_000, axisLine: { lineStyle: { color: p.axisLine } }, axisLabel: { color: p.axisLabel, hideOverlap: true }, splitLine: { show: true, lineStyle: { color: p.splitLine } } },
+    yAxis: { type: "value", min: 0, max: 12, name: "", nameLocation: "middle", nameGap: 46, nameTextStyle: { color: p.axisName }, axisLabel: { color: p.axisLabel, formatter: state.options.formatValue }, splitLine: { lineStyle: { color: p.splitLine } } },
+    dataZoom: [{ type: "inside", xAxisIndex: 0, filterMode: "none", startValue: 0, endValue: 86_400_000, zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false }],
+    legend: { show: false, data: ["a"], selected: { a: true } },
+    tooltip: { trigger: "axis", confine: true, backgroundColor: p.tooltipBg, borderColor: p.tooltipBorder, borderWidth: 1, textStyle: { color: p.tooltipText, fontSize: 12 }, formatter: expect.any(Function) },
+    series: [{ id: "a", name: "a", type: "line", data: series[0].points, color: "#ca3e2b", showSymbol: false, connectNulls: false, stack: undefined, areaStyle: undefined, lineStyle: { color: "#ca3e2b", width: 1, opacity: 1, type: "solid" }, itemStyle: { color: "#ca3e2b", opacity: 1 }, emphasis: { disabled: true }, tooltip: { show: true }, z: 2 }, buildGuides(state)],
+  });
+  expect(o.tooltip.formatter({ seriesName: "a", value: [0, 2] })).toBe('<div>time</div><div><span style="color:#ca3e2b">●</span> Alpha: 2</div>');
 });

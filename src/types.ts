@@ -22,7 +22,7 @@ export interface TimeChartOptions {
   series: TimeSeries[];
   formatValue?: (value: number) => string;
   formatTime?: (timeMs: number) => string;
-  yAxis?: { min?: number | "auto"; max?: number | "data" | "auto"; name?: string };
+  yAxis?: { min?: number | "auto"; max?: number | "data" | "auto"; name?: string; interval?: number; minorInterval?: number };
   window?: TimeWindow;
   tooltip?: "axis" | "item";
   legend?: { show?: boolean; collapsed?: boolean; width?: number };
