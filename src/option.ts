@@ -179,7 +179,9 @@ export function buildOption(state: NormalizedState) {
   });
   return {
     animation: false,
-    grid: { left: GRID_LEFT, top: GRID_TOP, bottom: GRID_BOTTOM, right: gridRight(state) },
+    // The insets are the plot itself: guides, legend and linked alignment are
+    // placed from them, so ECharts 6 must not shrink it around axis labels.
+    grid: { left: GRID_LEFT, top: GRID_TOP, bottom: GRID_BOTTOM, right: gridRight(state), outerBoundsMode: "none" as const },
     // Linked charts point at the hovered time itself (no snapping to a point,
     // which differs between charts), also with item tooltips.
     xAxis: { type: "time" as const, min: extent.start, max: extent.end, axisPointer: { show: true, snap: false, triggerTooltip: (options.tooltip ?? "axis") === "axis" }, axisLine: { lineStyle: { color: p.axisLine } }, axisLabel: { color: p.axisLabel, hideOverlap: true }, splitLine: { show: true, lineStyle: { color: p.splitLine } } },
@@ -187,7 +189,9 @@ export function buildOption(state: NormalizedState) {
       // null (not undefined) means "auto" so merged updates clear an old bound.
       type: "value" as const, min: options.yAxis?.min === "auto" ? null : options.yAxis?.min ?? (values.min >= 0 ? 0 : null),
       max: options.yAxis?.max === "auto" ? null : typeof options.yAxis?.max === "number" ? options.yAxis.max : (values.max > 0 ? values.max : 1) * 1.2,
-      name: options.yAxis?.name ?? "", nameLocation: "middle", nameGap: 46, nameTextStyle: { color: p.axisName },
+      // nameGap counts from the axis line: ECharts 6 would push the name past
+      // the labels, off the canvas.
+      name: options.yAxis?.name ?? "", nameLocation: "middle", nameGap: 46, nameMoveOverlap: false, nameTextStyle: { color: p.axisName },
       axisLabel: { color: p.axisLabel, formatter: formatValue }, splitLine: { lineStyle: { color: p.splitLine } },
       ...(options.yAxis?.interval !== undefined ? { interval: options.yAxis.interval } : {}),
       ...(options.yAxis?.minorInterval !== undefined ? { minorTick: { show: true, splitNumber: Math.round(options.yAxis.interval! / options.yAxis.minorInterval), lineStyle: { color: p.axisLine } }, minorSplitLine: { show: true, lineStyle: { color: p.splitLine, type: "dashed" as const } } } : {}),

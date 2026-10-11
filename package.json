@@ -23,7 +23,7 @@
     "demo": "vite --host 127.0.0.1 --port 5187 --strictPort"
   },
   "dependencies": {
-    "echarts": "^5.6.0"
+    "echarts": "^6.1.0"
   },
   "devDependencies": {
     "@types/node": "22.10.5",

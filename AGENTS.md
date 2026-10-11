@@ -2,7 +2,7 @@
 
 - A normal TypeScript library: `tsc` compiles `src/` to `dist/*.js` +
   `dist/*.d.ts` (ES modules). No bundling, no second module format, no
-  vendored copies; `echarts` is a regular dependency (`^5.6.0`).
+  vendored copies; `echarts` is a regular dependency (`^6.1.0`).
 - Public API: `createTimeChart`, `calendarGuides` and their types only.
 - Stay framework-free. No data loading, units, currencies, domain filters,
   or host business logic.
@@ -10,7 +10,7 @@
   parts, so guides stay on local midnight across DST changes.
 - Clean up every timer, observer, and media listener; destroy is idempotent.
 - Write specification tests first; run `npm run check` before delivery.
-- Consumers in `~/dev` (currently `~/dev/rs/rrd-ui/frontend`) use THIS
+- Consumers in `~/dev` (currently `~/dev/ts/rrd-graph`) use THIS
   working copy: they commit a normal npm range (`"^X.Y.Z"`), and link the
   path locally with `npm install --no-save <path-to-time-chart>`. The path
   link is never committed. After a change here, rebuild (`npm run build` or

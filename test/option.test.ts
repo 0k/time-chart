@@ -5,8 +5,8 @@ import { LineChart } from "echarts/charts";
 import { GridComponent, LegendComponent, MarkAreaComponent, MarkLineComponent } from "echarts/components";
 import { SVGRenderer } from "echarts/renderers";
 import { buildGuides, buildOption, normalizeState } from "../src/option";
-import { palettes } from "../src/palette";
 import type { TimeChartOptions } from "../src/types";
+import { palettes } from "../src/palette";
 
 echarts.use([LineChart, GridComponent, LegendComponent, MarkLineComponent, MarkAreaComponent, SVGRenderer]);
 
@@ -104,6 +104,25 @@ it("stacks from zero once a filled series turns stacked, even with a negative ax
   const stacked = { series: [{ ...series[0], stack: true }], yAxis: { min: -5 } };
   expect(svgOf(filled, stacked)).toBe(svgOf(stacked));
 });
+// Guides, legend and linked alignment are placed in pixels from the grid
+// insets, so ECharts must never shrink the plot to fit its axis labels.
+it("draws the plot exactly inside the grid insets, even with wide axis labels", () => {
+  const state = normalizeState({ series, yAxis: { name: "a long axis name" }, formatValue: v => `${v} ${"x".repeat(40)}` }, 600, 300, 0);
+  const o = buildOption(state);
+  const chart = echarts.init(null, null, { renderer: "svg", ssr: true, width: 600, height: 300 });
+  chart.setOption(o as unknown as echarts.EChartsCoreOption);
+  const corner = (t: number, v: number | null) => chart.convertToPixel({ gridIndex: 0 }, [t, v]) as number[];
+  expect([...corner(o.xAxis.min, o.yAxis.max), ...corner(o.xAxis.max, o.yAxis.min)].map(px => Math.round(px * 1e6) / 1e6)).toEqual([64, 64, 600 - o.grid.right, 300 - 44]);
+  chart.dispose();
+});
+it("draws the y-axis name 46px left of the axis line, however wide the labels", () => {
+  const state = normalizeState({ series, yAxis: { name: "Volts" }, formatValue: v => `${v} ${"x".repeat(12)}` }, 600, 300, 0);
+  const chart = echarts.init(null, null, { renderer: "svg", ssr: true, width: 600, height: 300 });
+  chart.setOption(buildOption(state) as unknown as echarts.EChartsCoreOption);
+  const name = chart.renderToSVGString().replace(/\n/g, " ").match(/<text[^<]*transform="matrix\(0,-1,1,0,([-\d.]+),[-\d.]+\)"[^<]*>Volts<\/text>/);
+  chart.dispose();
+  expect(Number(name?.[1])).toBe(64 - 46);
+});
 it("keeps line-less fills and bands in the legend but not the tooltip", () => {
   const state = normalizeState({ series: [{ ...series[0], line: false, fill: 0.2, min: [1, 3], max: [4, 12] }] });
   const o = buildOption(state);
@@ -158,9 +177,9 @@ it("preserves the complete legacy option when new fields are omitted", () => {
   const state = normalizeState({ series, locale: "en-GB", formatValue: v => String(v), formatTime: () => "time" }, 1000, 400, 86_400_000);
   const p = state.palette, o = buildOption(state);
   expect(o).toEqual({
-    animation: false, grid: { left: 64, top: 64, bottom: 44, right: 364 },
+    animation: false, grid: { left: 64, top: 64, bottom: 44, right: 364, outerBoundsMode: "none" },
     xAxis: { type: "time", min: -172_800_000, max: 259_200_000, axisPointer: { show: true, snap: false, triggerTooltip: true }, axisLine: { lineStyle: { color: p.axisLine } }, axisLabel: { color: p.axisLabel, hideOverlap: true }, splitLine: { show: true, lineStyle: { color: p.splitLine } } },
-    yAxis: { type: "value", min: 0, max: 12, name: "", nameLocation: "middle", nameGap: 46, nameTextStyle: { color: p.axisName }, axisLabel: { color: p.axisLabel, formatter: state.options.formatValue }, splitLine: { lineStyle: { color: p.splitLine } } },
+    yAxis: { type: "value", min: 0, max: 12, name: "", nameLocation: "middle", nameGap: 46, nameMoveOverlap: false, nameTextStyle: { color: p.axisName }, axisLabel: { color: p.axisLabel, formatter: state.options.formatValue }, splitLine: { lineStyle: { color: p.splitLine } } },
     dataZoom: [{ type: "inside", xAxisIndex: 0, filterMode: "none", startValue: 0, endValue: 86_400_000, zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false }],
     legend: { show: false, data: ["a"], selected: { a: true } },
     tooltip: { trigger: "axis", confine: true, backgroundColor: p.tooltipBg, borderColor: p.tooltipBorder, borderWidth: 1, textStyle: { color: p.tooltipText, fontSize: 12 }, formatter: expect.any(Function) },
