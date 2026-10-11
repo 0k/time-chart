@@ -9,6 +9,11 @@ export interface TimeSeries {
   max?: (number | null)[];
   stack?: boolean;
   color?: string;
+  dash?: "solid" | "dashed" | "dotted";
+  width?: number;
+  fill?: number;
+  band?: { pattern?: "solid" | "hatch"; opacity?: number };
+  line?: boolean;
 }
 
 export interface TimeWindow { start: number; end: number }

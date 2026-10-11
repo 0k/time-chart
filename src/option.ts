@@ -32,6 +32,11 @@ export function validateSeries(series: TimeSeries[]): void {
     if (!s.id || s.id.startsWith("\u0000") || ids.has(s.id)) throw new Error("Series ids must be unique, nonempty and not start with NUL");
     ids.add(s.id);
     if ((s.min === undefined) !== (s.max === undefined) || (s.min && (s.min.length !== s.points.length || s.max?.length !== s.points.length))) throw new Error(`Band arrays must both match points: ${s.id}`);
+    if (s.width !== undefined && (!Number.isFinite(s.width) || s.width <= 0)) throw new Error(`Width must be finite and positive: ${s.id}`);
+    if (s.fill !== undefined && (!Number.isFinite(s.fill) || s.fill <= 0 || s.fill > 1)) throw new Error(`Fill opacity must be in (0,1]: ${s.id}`);
+    if (s.fill !== undefined && s.stack) throw new Error(`Fill cannot be combined with stack: ${s.id}`);
+    if (s.band !== undefined && (s.min === undefined || s.max === undefined)) throw new Error(`Band style requires min and max: ${s.id}`);
+    if (s.band?.opacity !== undefined && (!Number.isFinite(s.band.opacity) || s.band.opacity <= 0 || s.band.opacity > 1)) throw new Error(`Band opacity must be in (0,1]: ${s.id}`);
     let previous = -Infinity;
     s.points.forEach(([t, v], i) => {
       if (!Number.isFinite(t) || t < previous || (v !== null && !Number.isFinite(v))) throw new Error(`Points must be finite and time-sorted: ${s.id}`);
@@ -110,6 +115,7 @@ export function buildGuides(state: NormalizedState) {
 export function buildOption(state: NormalizedState) {
   const { options, palette: p } = state;
   const labels = new Map(state.series.map(s => [s.id, s.label]));
+  const lineLess = new Set(state.series.filter(s => s.line === false).map(s => s.id));
   const formatValue = options.formatValue ?? (v => v.toLocaleString(options.locale));
   const formatTime = options.formatTime ?? (t => new Intl.DateTimeFormat(options.locale, { dateStyle: "medium", timeStyle: "short" }).format(t));
   const extent = dataExtent(state.series, state.now), span = Math.max(extent.end - extent.start, DAY_MS);
@@ -118,9 +124,9 @@ export function buildOption(state: NormalizedState) {
     const dim = state.highlight !== null && !state.highlight.has(s.id);
     return {
       id: s.id, name: s.id, type: "line" as const, data: s.points, color: state.colors.get(s.id), showSymbol: false, connectNulls: false,
-      stack: s.stack ? "__stack__" : undefined, areaStyle: s.stack ? { opacity: 0.6 } : undefined,
-      lineStyle: { color: state.colors.get(s.id), width: dim ? 0.5 : state.highlight ? 2 : 1, opacity: dim ? 0.7 : 1 },
-      itemStyle: { color: state.colors.get(s.id), opacity: dim ? 0.7 : 1 }, emphasis: { disabled: true }, tooltip: { show: true }, z: 2,
+      stack: s.stack ? "__stack__" : undefined, areaStyle: s.fill !== undefined ? { origin: "start" as const, opacity: s.fill } : s.stack ? { origin: "auto" as const, opacity: 0.6 } : undefined,
+      lineStyle: { color: state.colors.get(s.id), width: s.line === false ? 0 : (s.width ?? 1) * (dim ? 0.5 : state.highlight ? 2 : 1), opacity: s.line === false ? 0 : dim ? 0.7 : 1, type: s.dash ?? "solid" },
+      itemStyle: { color: state.colors.get(s.id), opacity: dim ? 0.7 : 1 }, emphasis: { disabled: true }, tooltip: { show: s.line !== false }, z: 2,
     };
   });
   const bands = state.series.flatMap(s => {
@@ -130,11 +136,12 @@ export function buildOption(state: NormalizedState) {
       const lo = s.min![i], hi = s.max![i], gap = v === null || lo === null || hi === null;
       lower.push([t, gap ? null : lo]); delta.push([t, gap ? null : hi - lo]);
     });
+    const decal = s.band?.pattern === "hatch" ? { color: state.colors.get(s.id), backgroundColor: "transparent", symbol: "rect", symbolSize: 1, dashArrayX: [1, 0], dashArrayY: [1, 5], rotation: Math.PI / 4 } : undefined;
     return [lower, delta].map((data, i) => ({
       id: `\u0000band:${s.id}:${i}`, name: `\u0000band:${s.id}:${i}`, type: "line" as const, data,
       stack: `\u0000band:${s.id}`, stackStrategy: "all" as const, silent: true, showSymbol: false, connectNulls: false,
-      lineStyle: { width: 0, opacity: 0 }, itemStyle: { color: state.colors.get(s.id), opacity: 0 },
-      areaStyle: { color: state.colors.get(s.id), opacity: i === 0 ? 0 : p.bandAlpha }, tooltip: { show: false }, emphasis: { disabled: true }, z: 1,
+      lineStyle: { width: 0, opacity: 0 }, itemStyle: { color: state.colors.get(s.id), opacity: 0, decal: i === 1 ? decal : undefined },
+      areaStyle: { color: i === 1 && decal ? "transparent" : state.colors.get(s.id), opacity: i === 0 ? 0 : s.band?.opacity ?? p.bandAlpha, decal: i === 1 ? decal : undefined }, tooltip: { show: false }, emphasis: { disabled: true }, z: 1,
     }));
   });
   return {
@@ -157,7 +164,7 @@ export function buildOption(state: NormalizedState) {
       formatter: (input: TooltipRow | TooltipRow[]) => {
         const rows = (Array.isArray(input) ? input : [input]).flatMap(row => {
           const id = row.seriesName ?? "", value = row.value;
-          if (!labels.has(id) || state.hidden.has(id) || !Array.isArray(value) || typeof value[0] !== "number" || typeof value[1] !== "number" || !Number.isFinite(value[1])) return [];
+          if (!labels.has(id) || lineLess.has(id) || state.hidden.has(id) || !Array.isArray(value) || typeof value[0] !== "number" || typeof value[1] !== "number" || !Number.isFinite(value[1])) return [];
           return [{ id, t: value[0] as number, v: value[1] as number }];
         }).sort((a, b) => b.v - a.v);
         if (!rows.length) return "";

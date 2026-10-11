@@ -50,6 +50,11 @@ The element must have a nonzero size. Times are Unix milliseconds.
 | ~group~        | Series of a group get close colors                           |
 | ~stack~        | Stack with the other stacked series                          |
 | ~color~        | Explicit CSS color instead of the generated one              |
+| ~dash~         | ~'solid'~ (default), ~'dashed'~ or ~'dotted'~ line style       |
+| ~width~        | Finite positive line width in pixels (default 1); highlighting doubles it, dimming halves it |
+| ~fill~         | Opacity in ~(0,1]~; fill to the bottom of the y axis, not stacked; cannot be combined with ~stack: true~ |
+| ~band~         | ~{pattern, opacity}~ for ~min~ / ~max~ bounds; ~pattern~ is ~'solid'~ (default) or diagonal ~'hatch'~ in the series color; ~opacity~ is in ~(0,1]~ (default 0.18) |
+| ~line~         | Draw the line (default ~true~); ~false~ keeps its band/fill and legend entry but excludes it from the tooltip |
 
 * Options
 
